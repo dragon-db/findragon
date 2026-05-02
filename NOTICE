@@ -1,0 +1,10 @@
+Findragon is a modified fork of Findroid.
+
+Upstream project:
+https://github.com/jarnedemeulemeester/findroid
+
+Fork notice:
+- Modified on 2026-05-02
+- Maintained as a DragonDB-focused fork
+- Initial cleanup removes upstream publishing, funding, and community metadata that does not apply to this fork
+- Full branding, icon replacement, and package rename are intentionally deferred to a later pass
