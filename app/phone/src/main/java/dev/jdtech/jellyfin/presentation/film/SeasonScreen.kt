@@ -1,6 +1,7 @@
 package dev.jdtech.jellyfin.presentation.film
 
 import android.content.Intent
+import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -35,10 +36,14 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.jdtech.jellyfin.PlayerActivity
+import dev.jdtech.jellyfin.data.BuildConfig as DataBuildConfig
 import dev.jdtech.jellyfin.core.presentation.dummy.dummySeason
 import dev.jdtech.jellyfin.film.presentation.season.SeasonAction
 import dev.jdtech.jellyfin.film.presentation.season.SeasonState
 import dev.jdtech.jellyfin.film.presentation.season.SeasonViewModel
+import dev.jdtech.jellyfin.film.presentation.issue.IssueReporterEvent
+import dev.jdtech.jellyfin.film.presentation.issue.IssueReporterState
+import dev.jdtech.jellyfin.film.presentation.issue.IssueReporterViewModel
 import dev.jdtech.jellyfin.models.FindroidItem
 import dev.jdtech.jellyfin.presentation.film.components.Direction
 import dev.jdtech.jellyfin.presentation.film.components.EpisodeCard
@@ -46,9 +51,11 @@ import dev.jdtech.jellyfin.presentation.film.components.ItemButtonsBar
 import dev.jdtech.jellyfin.presentation.film.components.ItemHeader
 import dev.jdtech.jellyfin.presentation.film.components.ItemPoster
 import dev.jdtech.jellyfin.presentation.film.components.ItemTopBar
+import dev.jdtech.jellyfin.presentation.film.components.IssueReporterDialogs
 import dev.jdtech.jellyfin.presentation.theme.FindroidTheme
 import dev.jdtech.jellyfin.presentation.theme.spacings
 import dev.jdtech.jellyfin.presentation.utils.rememberSafePadding
+import dev.jdtech.jellyfin.utils.ObserveAsEvents
 import java.util.UUID
 import org.jellyfin.sdk.model.api.BaseItemKind
 
@@ -60,14 +67,31 @@ fun SeasonScreen(
     navigateToItem: (item: FindroidItem) -> Unit,
     navigateToSeries: (seriesId: UUID) -> Unit,
     viewModel: SeasonViewModel = hiltViewModel(),
+    issueReporterViewModel: IssueReporterViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
+    val isIssueReportingEnabled = DataBuildConfig.JELLYSEERR_BASE_URL.isNotBlank()
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val issueReporterState by issueReporterViewModel.state.collectAsStateWithLifecycle()
 
     LaunchedEffect(true) { viewModel.loadSeason(seasonId = seasonId) }
 
+    LaunchedEffect(state.season, isIssueReportingEnabled) {
+        if (isIssueReportingEnabled) {
+            state.season?.let(issueReporterViewModel::loadForSeason)
+        }
+    }
+
+    ObserveAsEvents(issueReporterViewModel.events) { event ->
+        when (event) {
+            is IssueReporterEvent.Message ->
+                Toast.makeText(context, event.message, Toast.LENGTH_SHORT).show()
+        }
+    }
+
     SeasonScreenLayout(
         state = state,
+        issueReporterState = issueReporterState,
         onAction = { action ->
             when (action) {
                 is SeasonAction.Play -> {
@@ -84,11 +108,32 @@ fun SeasonScreen(
             }
             viewModel.onAction(action)
         },
+        onReportIssueClick =
+            if (isIssueReportingEnabled) {
+                { issueReporterViewModel.onIssueButtonClick() }
+            } else {
+                null
+            },
     )
+
+    if (isIssueReportingEnabled) {
+        IssueReporterDialogs(
+            state = issueReporterState,
+            onIssueClick = issueReporterViewModel::onIssueSelected,
+            onReportNewClick = issueReporterViewModel::onReportNewClick,
+            onSubmit = issueReporterViewModel::submit,
+            onDismiss = issueReporterViewModel::dismissDialogs,
+        )
+    }
 }
 
 @Composable
-private fun SeasonScreenLayout(state: SeasonState, onAction: (SeasonAction) -> Unit) {
+private fun SeasonScreenLayout(
+    state: SeasonState,
+    issueReporterState: IssueReporterState,
+    onAction: (SeasonAction) -> Unit,
+    onReportIssueClick: (() -> Unit)?,
+) {
     val safePadding = rememberSafePadding()
 
     val paddingStart = safePadding.start + MaterialTheme.spacings.default
@@ -162,6 +207,9 @@ private fun SeasonScreenLayout(state: SeasonState, onAction: (SeasonAction) -> U
                         onDownloadClick = {},
                         onDownloadCancelClick = {},
                         onDownloadDeleteClick = {},
+                        onReportIssueClick = onReportIssueClick,
+                        issueCount = issueReporterState.issueCount,
+                        issueEnabled = !issueReporterState.isLoading,
                         modifier =
                             Modifier.padding(start = paddingStart, end = paddingEnd).fillMaxWidth(),
                         canPlay = state.episodes.isNotEmpty(),
@@ -204,5 +252,12 @@ private fun SeasonScreenLayout(state: SeasonState, onAction: (SeasonAction) -> U
 @PreviewScreenSizes
 @Composable
 private fun SeasonScreenLayoutPreview() {
-    FindroidTheme { SeasonScreenLayout(state = SeasonState(season = dummySeason), onAction = {}) }
+    FindroidTheme {
+        SeasonScreenLayout(
+            state = SeasonState(season = dummySeason),
+            issueReporterState = IssueReporterState(),
+            onAction = {},
+            onReportIssueClick = {},
+        )
+    }
 }

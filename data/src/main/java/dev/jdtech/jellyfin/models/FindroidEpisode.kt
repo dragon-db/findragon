@@ -35,6 +35,7 @@ data class FindroidEpisode(
     override val images: FindroidImages,
     override val chapters: List<FindroidChapter>,
     override val trickplayInfo: Map<String, FindroidTrickplayInfo>?,
+    val tmdbId: Int? = null,
 ) : FindroidItem, FindroidSources
 
 suspend fun BaseItemDto.toFindroidEpisode(
@@ -74,6 +75,7 @@ suspend fun BaseItemDto.toFindroidEpisode(
             chapters = toFindroidChapters(),
             trickplayInfo =
                 trickplay?.mapValues { it.value[it.value.keys.max()]!!.toFindroidTrickplayInfo() },
+            tmdbId = providerIds?.tmdbId(),
         )
     } catch (_: NullPointerException) {
         null

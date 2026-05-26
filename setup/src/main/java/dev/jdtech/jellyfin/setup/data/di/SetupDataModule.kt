@@ -5,10 +5,13 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import dev.jdtech.jellyfin.api.JellyfinApi
+import dev.jdtech.jellyfin.auth.SecureCredentialsStore
 import dev.jdtech.jellyfin.database.ServerDatabaseDao
 import dev.jdtech.jellyfin.settings.domain.AppPreferences
 import dev.jdtech.jellyfin.setup.data.SetupRepositoryImpl
 import dev.jdtech.jellyfin.setup.domain.SetupRepository
+import dev.jdtech.jellyfin.setup.presentation.welcome.BuildConfigDefaultServerConfig
+import dev.jdtech.jellyfin.setup.presentation.welcome.DefaultServerConfig
 import javax.inject.Singleton
 
 @Module
@@ -16,15 +19,23 @@ import javax.inject.Singleton
 object SetupDataModule {
     @Singleton
     @Provides
+    fun provideDefaultServerConfig(): DefaultServerConfig {
+        return BuildConfigDefaultServerConfig()
+    }
+
+    @Singleton
+    @Provides
     fun provideSetupRepository(
         jellyfinApi: JellyfinApi,
         serverDatabase: ServerDatabaseDao,
         appPreferences: AppPreferences,
+        secureCredentialsStore: SecureCredentialsStore,
     ): SetupRepository {
         return SetupRepositoryImpl(
             jellyfinApi = jellyfinApi,
             database = serverDatabase,
             appPreferences = appPreferences,
+            secureCredentialsStore = secureCredentialsStore,
         )
     }
 }

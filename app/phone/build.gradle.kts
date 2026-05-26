@@ -136,4 +136,6 @@ dependencies {
 
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.androidx.navigation.compose)
+
+    testImplementation("junit:junit:4.13.2")
 }

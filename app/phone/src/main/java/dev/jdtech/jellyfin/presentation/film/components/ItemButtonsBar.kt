@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.material3.MaterialTheme
@@ -52,6 +53,9 @@ fun ItemButtonsBar(
     modifier: Modifier = Modifier,
     downloaderState: DownloaderState? = null,
     canPlay: Boolean = true,
+    onReportIssueClick: (() -> Unit)? = null,
+    issueCount: Int = 0,
+    issueEnabled: Boolean = true,
 ) {
     val context = LocalContext.current
     val windowSizeClass = currentWindowAdaptiveInfo().windowSizeClass
@@ -151,6 +155,33 @@ fun ItemButtonsBar(
                                 contentDescription = null,
                             )
                         }
+                    }
+                }
+                onReportIssueClick?.let { reportIssue ->
+                    val hasOpenIssue = issueCount > 0
+                    FilledTonalIconButton(
+                        onClick = reportIssue,
+                        enabled = issueEnabled,
+                        colors =
+                            if (hasOpenIssue) {
+                                IconButtonDefaults.filledTonalIconButtonColors(
+                                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                                )
+                            } else {
+                                IconButtonDefaults.filledTonalIconButtonColors()
+                            },
+                    ) {
+                        Icon(
+                            painter = painterResource(CoreR.drawable.ic_alert_circle),
+                            contentDescription = null,
+                            tint =
+                                if (hasOpenIssue) {
+                                    MaterialTheme.colorScheme.onErrorContainer
+                                } else {
+                                    LocalContentColor.current
+                                },
+                        )
                     }
                 }
                 if (downloaderState != null && !downloaderState.isDownloading) {

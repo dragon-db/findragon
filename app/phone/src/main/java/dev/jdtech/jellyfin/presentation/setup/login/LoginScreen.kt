@@ -32,6 +32,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -64,8 +65,16 @@ fun LoginScreen(
     onBackClick: () -> Unit,
     prefilledUsername: String? = null,
     viewModel: LoginViewModel = hiltViewModel(),
+    phoneLoginCredentialsViewModel: PhoneLoginCredentialsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    var submittedPassword by remember { mutableStateOf<String?>(null) }
+    val savePassword = remember(phoneLoginCredentialsViewModel) {
+        { password: String -> phoneLoginCredentialsViewModel.savePasswordForCurrentUser(password) }
+    }
+    val clearPassword = remember(phoneLoginCredentialsViewModel) {
+        { phoneLoginCredentialsViewModel.clearPasswordForCurrentUser() }
+    }
 
     LaunchedEffect(true) {
         viewModel.loadServer()
@@ -75,7 +84,11 @@ fun LoginScreen(
 
     ObserveAsEvents(viewModel.events) { event ->
         when (event) {
-            is LoginEvent.Success -> onSuccess()
+            is LoginEvent.Success -> {
+                submittedPassword?.let(savePassword) ?: clearPassword()
+                submittedPassword = null
+                onSuccess()
+            }
         }
     }
 
@@ -83,9 +96,10 @@ fun LoginScreen(
         state = state,
         onAction = { action ->
             when (action) {
+                is LoginAction.OnLoginClick -> submittedPassword = action.password
+                is LoginAction.OnQuickConnectClick -> submittedPassword = null
                 is LoginAction.OnChangeServerClick -> onChangeServerClick()
                 is LoginAction.OnBackClick -> onBackClick()
-                else -> Unit
             }
             viewModel.onAction(action)
         },
@@ -101,7 +115,7 @@ private fun LoginScreenLayout(
 ) {
     val scrollState = rememberScrollState()
     var username by rememberSaveable { mutableStateOf(prefilledUsername ?: "") }
-    var password by rememberSaveable { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
     var passwordVisible by rememberSaveable { mutableStateOf(false) }
 
     val doLogin = { onAction(LoginAction.OnLoginClick(username, password)) }
