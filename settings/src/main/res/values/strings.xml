@@ -62,6 +62,14 @@
     <string name="picture_in_picture_gesture_summary">Use home button or gesture to enter picture-in-picture while the video is playing</string>
     <string name="offline_mode">Offline Mode</string>
     <string name="offline_mode_summary">Watch movies and series without a connection to the server</string>
+    <string name="account">Account</string>
+    <string name="account_username">Username</string>
+    <string name="account_email">Email</string>
+    <string name="account_expiry">Expiry</string>
+    <string name="account_not_set">Not set</string>
+    <string name="account_no_expiry">No expiry</string>
+    <string name="account_loading">Loading account details\u2026</string>
+    <string name="account_error">Account details error</string>
     <string name="theme">Theme</string>
     <string name="theme_system">Follow system</string>
     <string name="theme_light">Light</string>
