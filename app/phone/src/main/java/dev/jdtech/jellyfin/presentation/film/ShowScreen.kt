@@ -253,7 +253,7 @@ private fun ShowScreenLayout(
                         onDownloadDeleteClick = {},
                         onReportIssueClick = onReportIssueClick,
                         issueCount = issueReporterState.issueCount,
-                        issueEnabled = !issueReporterState.isLoading,
+                        issueEnabled = issueReporterState.canReport,
                         modifier = Modifier.fillMaxWidth(),
                         canPlay = state.seasons.isNotEmpty(),
                     )

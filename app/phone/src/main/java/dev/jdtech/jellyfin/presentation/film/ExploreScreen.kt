@@ -74,7 +74,7 @@ fun ExploreScreen(
 
     ExploreScreenLayout(
         state = state,
-        onRetryClick = { viewModel.loadData() },
+        onRetryClick = { viewModel.loadData(isRefreshing = true) },
         onSearchQueryChanged = viewModel::search,
         onMediaClick = onMediaClick,
         onCancelRecentRequest = viewModel::cancelRecentRequest,
@@ -151,7 +151,7 @@ private fun ExploreScreenLayout(
                 }
             }
             else -> {
-                PullToRefreshBox(isRefreshing = false, onRefresh = onRetryClick) {
+                PullToRefreshBox(isRefreshing = state.isRefreshing, onRefresh = onRetryClick) {
                     Box(modifier = Modifier.fillMaxSize()) {
                         if (!searchExpanded) {
                             LazyColumn(

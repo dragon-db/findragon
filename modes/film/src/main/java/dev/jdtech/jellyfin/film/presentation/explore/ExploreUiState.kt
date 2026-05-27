@@ -18,6 +18,7 @@ data class ExploreUiState(
     val authRequired: Boolean = false,
     val authError: Boolean = false,
     val error: Throwable? = null,
+    val isRefreshing: Boolean = false,
 )
 
 data class ExploreDetailState(

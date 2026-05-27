@@ -225,8 +225,8 @@ class JellyseerrRepositoryImpl(
     override suspend fun createIssue(request: CreateJellyseerrIssue): JellyseerrIssue {
         return runRequest {
             withSession { sessionCookie ->
-                retryJellyseerrRequest("create issue ${request.mediaId}") {
-                    apiService.createIssue(
+                apiService
+                    .createIssue(
                         sessionCookie = sessionCookie,
                         request =
                             CreateIssueRequestDto(
@@ -237,7 +237,7 @@ class JellyseerrRepositoryImpl(
                                 problemEpisode = request.problemEpisode,
                             ),
                     )
-                }.toJellyseerrIssue()
+                    .toJellyseerrIssue()
             }
         }
     }
@@ -269,6 +269,8 @@ class JellyseerrRepositoryImpl(
                     jellyfinMediaId,
                     media.tmdbId,
                 )
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Timber.w(
                     e,
@@ -286,6 +288,8 @@ class JellyseerrRepositoryImpl(
                 ?: throw JellyseerrWatchException(
                     "Findroid could not find this title in Jellyfin. Jellyseerr may be out of sync with the library for this user.",
                 )
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             if (e is JellyseerrWatchException) {
                 throw e

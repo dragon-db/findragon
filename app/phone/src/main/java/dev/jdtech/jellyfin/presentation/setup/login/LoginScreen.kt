@@ -69,12 +69,6 @@ fun LoginScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     var submittedPassword by remember { mutableStateOf<String?>(null) }
-    val savePassword = remember(phoneLoginCredentialsViewModel) {
-        { password: String -> phoneLoginCredentialsViewModel.savePasswordForCurrentUser(password) }
-    }
-    val clearPassword = remember(phoneLoginCredentialsViewModel) {
-        { phoneLoginCredentialsViewModel.clearPasswordForCurrentUser() }
-    }
 
     LaunchedEffect(true) {
         viewModel.loadServer()
@@ -85,7 +79,9 @@ fun LoginScreen(
     ObserveAsEvents(viewModel.events) { event ->
         when (event) {
             is LoginEvent.Success -> {
-                submittedPassword?.let(savePassword) ?: clearPassword()
+                submittedPassword?.let { password ->
+                    phoneLoginCredentialsViewModel.savePasswordForCurrentUser(password)
+                } ?: phoneLoginCredentialsViewModel.clearPasswordForCurrentUser()
                 submittedPassword = null
                 onSuccess()
             }

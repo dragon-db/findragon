@@ -32,6 +32,10 @@ constructor(
     val events = eventsChannel.receiveAsFlow()
 
     private fun continueSetup() {
+        if (_state.value.isLoading) {
+            return
+        }
+
         val defaultServerUrl = defaultServerConfig.serverUrl
         if (defaultServerUrl.isBlank()) {
             viewModelScope.launch { eventsChannel.send(WelcomeEvent.OpenManualServerSetup) }
@@ -41,15 +45,14 @@ constructor(
     }
 
     private fun connectToDragonDb(defaultServerUrl: String) {
-        viewModelScope.launch {
-            _state.emit(
-                _state.value.copy(
-                    isLoading = true,
-                    error = null,
-                    showManualServerFallback = false,
-                )
+        _state.value =
+            _state.value.copy(
+                isLoading = true,
+                error = null,
+                showManualServerFallback = false,
             )
 
+        viewModelScope.launch {
             try {
                 val server = repository.addServer(defaultServerUrl)
                 appPreferences.setValue(appPreferences.currentServer, server.id)

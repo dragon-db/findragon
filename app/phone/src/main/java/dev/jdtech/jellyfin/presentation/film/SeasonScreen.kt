@@ -209,7 +209,7 @@ private fun SeasonScreenLayout(
                         onDownloadDeleteClick = {},
                         onReportIssueClick = onReportIssueClick,
                         issueCount = issueReporterState.issueCount,
-                        issueEnabled = !issueReporterState.isLoading,
+                        issueEnabled = issueReporterState.canReport,
                         modifier =
                             Modifier.padding(start = paddingStart, end = paddingEnd).fillMaxWidth(),
                         canPlay = state.episodes.isNotEmpty(),

@@ -11,6 +11,7 @@ import dev.jdtech.jellyfin.models.FindroidSeason
 import dev.jdtech.jellyfin.models.FindroidShow
 import dev.jdtech.jellyfin.repository.JellyfinRepository
 import javax.inject.Inject
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -165,6 +166,8 @@ constructor(
                         showExistingIssues = false,
                     )
                 eventChannel.send(IssueReporterEvent.Message("Issue submitted."))
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 _state.value = _state.value.copy(isSubmitting = false, errorMessage = e.message)
                 eventChannel.send(IssueReporterEvent.Message(e.message ?: "Failed to submit issue."))
@@ -188,6 +191,8 @@ constructor(
                 val issues =
                     target.seerrMediaId?.let { jellyseerrRepository.getOpenIssues(it) }.orEmpty()
                 _state.value = IssueReporterState(target = target, openIssues = issues)
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 _state.value =
                     IssueReporterState(

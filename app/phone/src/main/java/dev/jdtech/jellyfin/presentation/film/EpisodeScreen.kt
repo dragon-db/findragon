@@ -290,7 +290,7 @@ private fun EpisodeScreenLayout(
                         },
                         onReportIssueClick = onReportIssueClick,
                         issueCount = issueReporterState.issueCount,
-                        issueEnabled = !issueReporterState.isLoading,
+                        issueEnabled = issueReporterState.canReport,
                         modifier = Modifier.fillMaxWidth(),
                     )
                     Spacer(Modifier.height(MaterialTheme.spacings.small))

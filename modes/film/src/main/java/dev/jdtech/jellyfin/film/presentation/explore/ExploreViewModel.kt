@@ -32,7 +32,7 @@ class ExploreViewModel @Inject constructor(private val repository: JellyseerrRep
     private var currentSearchJob: Job? = null
     private var currentDetailJob: Job? = null
 
-    fun loadData() {
+    fun loadData(isRefreshing: Boolean = false) {
         viewModelScope.launch {
             _state.emit(
                 _state.value.copy(
@@ -44,6 +44,7 @@ class ExploreViewModel @Inject constructor(private val repository: JellyseerrRep
                     authRequired = false,
                     authError = false,
                     error = null,
+                    isRefreshing = isRefreshing,
                 )
             )
 
@@ -90,6 +91,7 @@ class ExploreViewModel @Inject constructor(private val repository: JellyseerrRep
                         popularMovies = popularMovies.await(),
                         popularSeries = popularSeries.await(),
                         upcomingSeries = upcomingSeries.await(),
+                        isRefreshing = false,
                     )
                 )
             }
@@ -207,9 +209,10 @@ class ExploreViewModel @Inject constructor(private val repository: JellyseerrRep
 
     fun toggleSeasonExpanded(seasonNumber: Int) {
         val detail = _state.value.detail
-        if (detail.mediaType != JellyseerrMediaType.TV || detail.tmdbId == null) {
+        if (detail.mediaType != JellyseerrMediaType.TV) {
             return
         }
+        val tmdbId = detail.tmdbId ?: return
 
         val updatedExpandedSeason =
             if (detail.expandedSeasonNumber == seasonNumber) {
@@ -219,6 +222,9 @@ class ExploreViewModel @Inject constructor(private val repository: JellyseerrRep
             }
 
         viewModelScope.launch {
+            if (!isCurrentDetail(tmdbId, JellyseerrMediaType.TV)) {
+                return@launch
+            }
             _state.emit(
                 _state.value.copy(
                     detail = _state.value.detail.copy(expandedSeasonNumber = updatedExpandedSeason)
@@ -231,6 +237,9 @@ class ExploreViewModel @Inject constructor(private val repository: JellyseerrRep
         }
 
         viewModelScope.launch {
+            if (!isCurrentDetail(tmdbId, JellyseerrMediaType.TV)) {
+                return@launch
+            }
             _state.emit(
                 _state.value.copy(
                     detail =
@@ -243,7 +252,10 @@ class ExploreViewModel @Inject constructor(private val repository: JellyseerrRep
             )
 
             try {
-                val seasonDetails = repository.getTvSeason(detail.tmdbId, seasonNumber)
+                val seasonDetails = repository.getTvSeason(tmdbId, seasonNumber)
+                if (!isCurrentDetail(tmdbId, JellyseerrMediaType.TV)) {
+                    return@launch
+                }
                 _state.emit(
                     _state.value.copy(
                         detail =
@@ -257,7 +269,12 @@ class ExploreViewModel @Inject constructor(private val repository: JellyseerrRep
                             )
                     )
                 )
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
+                if (!isCurrentDetail(tmdbId, JellyseerrMediaType.TV)) {
+                    return@launch
+                }
                 _state.emit(
                     _state.value.copy(
                         detail =
@@ -324,6 +341,7 @@ class ExploreViewModel @Inject constructor(private val repository: JellyseerrRep
     fun submitSelectedTvSeasons() {
         val detail = _state.value.detail
         val tvDetails = detail.tvDetails ?: return
+        val tmdbId = tvDetails.tmdbId
         val requestableSeasonNumbers = tvDetails.requestableSeasonNumbers
         val selectedSeasonNumbers =
             if (detail.selectedSeasonNumbers.isEmpty()) {
@@ -344,6 +362,9 @@ class ExploreViewModel @Inject constructor(private val repository: JellyseerrRep
         }
 
         viewModelScope.launch {
+            if (!isCurrentDetail(tmdbId, JellyseerrMediaType.TV)) {
+                return@launch
+            }
             _state.emit(
                 _state.value.copy(
                     detail = _state.value.detail.copy(isSubmittingRequest = true, errorMessage = null)
@@ -353,13 +374,20 @@ class ExploreViewModel @Inject constructor(private val repository: JellyseerrRep
             try {
                 val updatedDetails =
                     repository.requestTvSeasons(
-                        tmdbId = tvDetails.tmdbId,
+                        tmdbId = tmdbId,
                         selectedSeasonNumbers = selectedSeasonNumbers,
                     )
-                updateTvDetails(updatedDetails, isSubmittingRequest = false)
+                if (isCurrentDetail(tmdbId, JellyseerrMediaType.TV)) {
+                    updateTvDetails(updatedDetails, isSubmittingRequest = false)
+                }
                 updateMedia(updatedDetails.toJellyseerrMedia())
                 refreshRecentRequests()
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
+                if (!isCurrentDetail(tmdbId, JellyseerrMediaType.TV)) {
+                    return@launch
+                }
                 _state.emit(
                     _state.value.copy(
                         detail =
@@ -376,6 +404,11 @@ class ExploreViewModel @Inject constructor(private val repository: JellyseerrRep
                 )
             }
         }
+    }
+
+    private fun isCurrentDetail(tmdbId: Int, mediaType: JellyseerrMediaType): Boolean {
+        val currentDetail = _state.value.detail
+        return currentDetail.tmdbId == tmdbId && currentDetail.mediaType == mediaType
     }
 
     fun openInJellyfin(media: JellyseerrMedia) {
