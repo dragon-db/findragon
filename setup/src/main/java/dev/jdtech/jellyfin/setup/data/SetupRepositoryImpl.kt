@@ -1,6 +1,7 @@
 package dev.jdtech.jellyfin.setup.data
 
 import dev.jdtech.jellyfin.api.JellyfinApi
+import dev.jdtech.jellyfin.auth.SecureCredentialsStore
 import dev.jdtech.jellyfin.core.R as CoreR
 import dev.jdtech.jellyfin.database.ServerDatabaseDao
 import dev.jdtech.jellyfin.models.ExceptionUiText
@@ -27,10 +28,70 @@ import org.jellyfin.sdk.model.api.QuickConnectResult
 import org.jellyfin.sdk.model.api.ServerDiscoveryInfo
 import timber.log.Timber
 
+internal data class SavedServerResult(
+    val server: Server,
+    val serverAddress: ServerAddress,
+    val shouldInsertServer: Boolean,
+    val shouldInsertAddress: Boolean,
+    val shouldUpdateServer: Boolean,
+)
+
+internal fun buildSavedServerResult(
+    existingServer: Server?,
+    existingAddresses: List<ServerAddress>,
+    serverId: String,
+    serverName: String,
+    recommendedAddress: String,
+    generatedAddressId: UUID = UUID.randomUUID(),
+): SavedServerResult {
+    if (existingServer == null) {
+        val serverAddress =
+            ServerAddress(
+                id = generatedAddressId,
+                serverId = serverId,
+                address = recommendedAddress,
+            )
+        val server =
+            Server(
+                id = serverId,
+                name = serverName,
+                currentServerAddressId = serverAddress.id,
+                currentUserId = null,
+            )
+
+        return SavedServerResult(
+            server = server,
+            serverAddress = serverAddress,
+            shouldInsertServer = true,
+            shouldInsertAddress = true,
+            shouldUpdateServer = false,
+        )
+    }
+
+    val existingAddress = existingAddresses.firstOrNull { it.address == recommendedAddress }
+    val serverAddress =
+        existingAddress
+            ?: ServerAddress(
+                id = generatedAddressId,
+                serverId = existingServer.id,
+                address = recommendedAddress,
+            )
+    val updatedServer = existingServer.copy(currentServerAddressId = serverAddress.id)
+
+    return SavedServerResult(
+        server = updatedServer,
+        serverAddress = serverAddress,
+        shouldInsertServer = false,
+        shouldInsertAddress = existingAddress == null,
+        shouldUpdateServer = updatedServer != existingServer,
+    )
+}
+
 class SetupRepositoryImpl(
     private val jellyfinApi: JellyfinApi,
     private val database: ServerDatabaseDao,
     private val appPreferences: AppPreferences,
+    private val secureCredentialsStore: SecureCredentialsStore,
 ) : SetupRepository {
     override fun discoverServers(): Flow<ServerDiscoveryInfo> {
         return jellyfinApi.jellyfin.discovery.discoverLocalServers()
@@ -45,6 +106,7 @@ class SetupRepositoryImpl(
     }
 
     override suspend fun deleteServer(serverId: String) {
+        secureCredentialsStore.clearSecretsForServer(serverId)
         database.delete(serverId)
     }
 
@@ -124,50 +186,33 @@ class SetupRepositoryImpl(
         Timber.d("Connecting to server: ${serverInfo.serverName}")
 
         val serverInDatabase = database.get(serverInfo.id!!)
+        val existingAddresses =
+            serverInDatabase?.let { database.getServerWithAddresses(serverInDatabase.id).addresses }
+                ?: emptyList()
+        val savedServerResult =
+            buildSavedServerResult(
+                existingServer = serverInDatabase,
+                existingAddresses = existingAddresses,
+                serverId = serverInfo.id!!,
+                serverName = serverInfo.serverName!!,
+                recommendedAddress = recommendedServerInfo.address,
+            )
 
-        // Check if server is already in the database
-        // If so only add a new address to that server if it's different
-        val server =
-            if (serverInDatabase != null) {
-                val addresses = database.getServerWithAddresses(serverInDatabase.id).addresses
-                // If address is not in database, add it
-                if (addresses.none { it.address == recommendedServerInfo.address }) {
-                    val serverAddress =
-                        ServerAddress(
-                            id = UUID.randomUUID(),
-                            serverId = serverInDatabase.id,
-                            address = recommendedServerInfo.address,
-                        )
-
-                    database.insertServerAddress(serverAddress)
-                }
-                serverInDatabase
-            } else {
-                val serverAddress =
-                    ServerAddress(
-                        id = UUID.randomUUID(),
-                        serverId = serverInfo.id!!,
-                        address = recommendedServerInfo.address,
-                    )
-
-                val server =
-                    Server(
-                        id = serverInfo.id!!,
-                        name = serverInfo.serverName!!,
-                        currentServerAddressId = serverAddress.id,
-                        currentUserId = null,
-                    )
-
-                database.insertServer(server)
-                database.insertServerAddress(serverAddress)
-                server
-            }
+        if (savedServerResult.shouldInsertServer) {
+            database.insertServer(savedServerResult.server)
+        }
+        if (savedServerResult.shouldInsertAddress) {
+            database.insertServerAddress(savedServerResult.serverAddress)
+        }
+        if (savedServerResult.shouldUpdateServer) {
+            database.update(savedServerResult.server)
+        }
 
         jellyfinApi.apply {
             api.update(baseUrl = recommendedServerInfo.address, accessToken = null)
         }
 
-        return server
+        return savedServerResult.server
     }
 
     /**
@@ -263,6 +308,10 @@ class SetupRepositoryImpl(
     }
 
     override suspend fun deleteUser(userId: UUID) {
+        val user = database.getUser(userId) ?: return
+        secureCredentialsStore.clearUserPassword(user.serverId, user.name)
+        secureCredentialsStore.clearJellyseerrSession(user.serverId, user.name)
+
         // Let the user delete the current active user for now
         /*val currentUser = getCurrentUser() ?: return
         if (userId == currentUser.id) {

@@ -1,6 +1,7 @@
 package dev.jdtech.jellyfin.presentation.film
 
 import android.content.Intent
+import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -38,6 +39,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.jdtech.jellyfin.PlayerActivity
 import dev.jdtech.jellyfin.core.R as CoreR
+import dev.jdtech.jellyfin.data.BuildConfig as DataBuildConfig
 import dev.jdtech.jellyfin.core.presentation.downloader.DownloaderAction
 import dev.jdtech.jellyfin.core.presentation.downloader.DownloaderEvent
 import dev.jdtech.jellyfin.core.presentation.downloader.DownloaderState
@@ -47,11 +49,15 @@ import dev.jdtech.jellyfin.core.presentation.dummy.dummyVideoMetadata
 import dev.jdtech.jellyfin.film.presentation.episode.EpisodeAction
 import dev.jdtech.jellyfin.film.presentation.episode.EpisodeState
 import dev.jdtech.jellyfin.film.presentation.episode.EpisodeViewModel
+import dev.jdtech.jellyfin.film.presentation.issue.IssueReporterEvent
+import dev.jdtech.jellyfin.film.presentation.issue.IssueReporterState
+import dev.jdtech.jellyfin.film.presentation.issue.IssueReporterViewModel
 import dev.jdtech.jellyfin.presentation.film.components.ActorsRow
 import dev.jdtech.jellyfin.presentation.film.components.ExtraInfoText
 import dev.jdtech.jellyfin.presentation.film.components.ItemButtonsBar
 import dev.jdtech.jellyfin.presentation.film.components.ItemHeader
 import dev.jdtech.jellyfin.presentation.film.components.ItemTopBar
+import dev.jdtech.jellyfin.presentation.film.components.IssueReporterDialogs
 import dev.jdtech.jellyfin.presentation.film.components.OverviewText
 import dev.jdtech.jellyfin.presentation.film.components.VideoMetadataBar
 import dev.jdtech.jellyfin.presentation.theme.FindroidTheme
@@ -72,17 +78,26 @@ fun EpisodeScreen(
     navigateToSeason: (seasonId: UUID) -> Unit,
     viewModel: EpisodeViewModel = hiltViewModel(),
     downloaderViewModel: DownloaderViewModel = hiltViewModel(),
+    issueReporterViewModel: IssueReporterViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
     val isOfflineMode = LocalOfflineMode.current
+    val isIssueReportingEnabled = DataBuildConfig.JELLYSEERR_BASE_URL.isNotBlank()
 
     val state by viewModel.state.collectAsStateWithLifecycle()
     val downloaderState by downloaderViewModel.state.collectAsStateWithLifecycle()
+    val issueReporterState by issueReporterViewModel.state.collectAsStateWithLifecycle()
 
     LaunchedEffect(true) { viewModel.loadEpisode(episodeId = episodeId) }
 
     LaunchedEffect(state.episode) {
         state.episode?.let { episode -> downloaderViewModel.update(episode) }
+    }
+
+    LaunchedEffect(state.episode, isIssueReportingEnabled) {
+        if (isIssueReportingEnabled) {
+            state.episode?.let(issueReporterViewModel::loadForEpisode)
+        }
     }
 
     ObserveAsEvents(downloaderViewModel.events) { event ->
@@ -100,9 +115,17 @@ fun EpisodeScreen(
         }
     }
 
+    ObserveAsEvents(issueReporterViewModel.events) { event ->
+        when (event) {
+            is IssueReporterEvent.Message ->
+                Toast.makeText(context, event.message, Toast.LENGTH_SHORT).show()
+        }
+    }
+
     EpisodeScreenLayout(
         state = state,
         downloaderState = downloaderState,
+        issueReporterState = issueReporterState,
         onAction = { action ->
             when (action) {
                 is EpisodeAction.Play -> {
@@ -121,15 +144,33 @@ fun EpisodeScreen(
             viewModel.onAction(action)
         },
         onDownloaderAction = { action -> downloaderViewModel.onAction(action) },
+        onReportIssueClick =
+            if (isIssueReportingEnabled) {
+                { issueReporterViewModel.onIssueButtonClick() }
+            } else {
+                null
+            },
     )
+
+    if (isIssueReportingEnabled) {
+        IssueReporterDialogs(
+            state = issueReporterState,
+            onIssueClick = issueReporterViewModel::onIssueSelected,
+            onReportNewClick = issueReporterViewModel::onReportNewClick,
+            onSubmit = issueReporterViewModel::submit,
+            onDismiss = issueReporterViewModel::dismissDialogs,
+        )
+    }
 }
 
 @Composable
 private fun EpisodeScreenLayout(
     state: EpisodeState,
     downloaderState: DownloaderState,
+    issueReporterState: IssueReporterState,
     onAction: (EpisodeAction) -> Unit,
     onDownloaderAction: (DownloaderAction) -> Unit,
+    onReportIssueClick: (() -> Unit)?,
 ) {
     val safePadding = rememberSafePadding()
 
@@ -247,6 +288,9 @@ private fun EpisodeScreenLayout(
                         onDownloadDeleteClick = {
                             onDownloaderAction(DownloaderAction.DeleteDownload(episode))
                         },
+                        onReportIssueClick = onReportIssueClick,
+                        issueCount = issueReporterState.issueCount,
+                        issueEnabled = issueReporterState.canReport,
                         modifier = Modifier.fillMaxWidth(),
                     )
                     Spacer(Modifier.height(MaterialTheme.spacings.small))
@@ -309,8 +353,10 @@ private fun EpisodeScreenLayoutPreview() {
         EpisodeScreenLayout(
             state = EpisodeState(episode = dummyEpisode, videoMetadata = dummyVideoMetadata),
             downloaderState = DownloaderState(),
+            issueReporterState = IssueReporterState(),
             onAction = {},
             onDownloaderAction = {},
+            onReportIssueClick = {},
         )
     }
 }

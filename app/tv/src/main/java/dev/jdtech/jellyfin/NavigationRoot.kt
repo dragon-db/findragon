@@ -94,7 +94,10 @@ fun NavigationRoot(
         }
     NavHost(navController = navController, startDestination = startDestination) {
         composable<WelcomeRoute> {
-            WelcomeScreen(onContinueClick = { navController.navigate(ServersRoute) })
+            WelcomeScreen(
+                navigateToUsers = { navController.navigate(UsersRoute) },
+                onAddServerClick = { navController.navigate(AddServerRoute) },
+            )
         }
         composable<ServersRoute> {
             ServersScreen(

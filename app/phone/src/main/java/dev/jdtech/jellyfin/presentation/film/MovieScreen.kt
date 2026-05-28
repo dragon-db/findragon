@@ -36,6 +36,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.jdtech.jellyfin.PlayerActivity
 import dev.jdtech.jellyfin.core.R as CoreR
+import dev.jdtech.jellyfin.data.BuildConfig as DataBuildConfig
 import dev.jdtech.jellyfin.core.presentation.downloader.DownloaderAction
 import dev.jdtech.jellyfin.core.presentation.downloader.DownloaderEvent
 import dev.jdtech.jellyfin.core.presentation.downloader.DownloaderState
@@ -45,12 +46,16 @@ import dev.jdtech.jellyfin.core.presentation.dummy.dummyVideoMetadata
 import dev.jdtech.jellyfin.film.presentation.movie.MovieAction
 import dev.jdtech.jellyfin.film.presentation.movie.MovieState
 import dev.jdtech.jellyfin.film.presentation.movie.MovieViewModel
+import dev.jdtech.jellyfin.film.presentation.issue.IssueReporterEvent
+import dev.jdtech.jellyfin.film.presentation.issue.IssueReporterState
+import dev.jdtech.jellyfin.film.presentation.issue.IssueReporterViewModel
 import dev.jdtech.jellyfin.presentation.film.components.ActorsRow
 import dev.jdtech.jellyfin.presentation.film.components.ExtraInfoText
 import dev.jdtech.jellyfin.presentation.film.components.InfoText
 import dev.jdtech.jellyfin.presentation.film.components.ItemButtonsBar
 import dev.jdtech.jellyfin.presentation.film.components.ItemHeader
 import dev.jdtech.jellyfin.presentation.film.components.ItemTopBar
+import dev.jdtech.jellyfin.presentation.film.components.IssueReporterDialogs
 import dev.jdtech.jellyfin.presentation.film.components.OverviewText
 import dev.jdtech.jellyfin.presentation.film.components.VideoMetadataBar
 import dev.jdtech.jellyfin.presentation.theme.FindroidTheme
@@ -69,17 +74,26 @@ fun MovieScreen(
     navigateToPerson: (personId: UUID) -> Unit,
     viewModel: MovieViewModel = hiltViewModel(),
     downloaderViewModel: DownloaderViewModel = hiltViewModel(),
+    issueReporterViewModel: IssueReporterViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
     val isOfflineMode = LocalOfflineMode.current
+    val isIssueReportingEnabled = DataBuildConfig.JELLYSEERR_BASE_URL.isNotBlank()
 
     val state by viewModel.state.collectAsStateWithLifecycle()
     val downloaderState by downloaderViewModel.state.collectAsStateWithLifecycle()
+    val issueReporterState by issueReporterViewModel.state.collectAsStateWithLifecycle()
 
     LaunchedEffect(true) { viewModel.loadMovie(movieId = movieId) }
 
     LaunchedEffect(state.movie) { state.movie?.let { movie -> downloaderViewModel.update(movie) } }
+
+    LaunchedEffect(state.movie, isIssueReportingEnabled) {
+        if (isIssueReportingEnabled) {
+            state.movie?.let(issueReporterViewModel::loadForMovie)
+        }
+    }
 
     ObserveAsEvents(downloaderViewModel.events) { event ->
         when (event) {
@@ -96,9 +110,17 @@ fun MovieScreen(
         }
     }
 
+    ObserveAsEvents(issueReporterViewModel.events) { event ->
+        when (event) {
+            is IssueReporterEvent.Message ->
+                Toast.makeText(context, event.message, Toast.LENGTH_SHORT).show()
+        }
+    }
+
     MovieScreenLayout(
         state = state,
         downloaderState = downloaderState,
+        issueReporterState = issueReporterState,
         onAction = { action ->
             when (action) {
                 is MovieAction.Play -> {
@@ -123,15 +145,33 @@ fun MovieScreen(
             viewModel.onAction(action)
         },
         onDownloaderAction = { action -> downloaderViewModel.onAction(action) },
+        onReportIssueClick =
+            if (isIssueReportingEnabled) {
+                { issueReporterViewModel.onIssueButtonClick() }
+            } else {
+                null
+            },
     )
+
+    if (isIssueReportingEnabled) {
+        IssueReporterDialogs(
+            state = issueReporterState,
+            onIssueClick = issueReporterViewModel::onIssueSelected,
+            onReportNewClick = issueReporterViewModel::onReportNewClick,
+            onSubmit = issueReporterViewModel::submit,
+            onDismiss = issueReporterViewModel::dismissDialogs,
+        )
+    }
 }
 
 @Composable
 private fun MovieScreenLayout(
     state: MovieState,
     downloaderState: DownloaderState,
+    issueReporterState: IssueReporterState,
     onAction: (MovieAction) -> Unit,
     onDownloaderAction: (DownloaderAction) -> Unit,
+    onReportIssueClick: (() -> Unit)?,
 ) {
     val safePadding = rememberSafePadding()
 
@@ -244,6 +284,9 @@ private fun MovieScreenLayout(
                         onDownloadDeleteClick = {
                             onDownloaderAction(DownloaderAction.DeleteDownload(movie))
                         },
+                        onReportIssueClick = onReportIssueClick,
+                        issueCount = issueReporterState.issueCount,
+                        issueEnabled = issueReporterState.canReport,
                         modifier = Modifier.fillMaxWidth(),
                     )
                     Spacer(Modifier.height(MaterialTheme.spacings.small))
@@ -289,8 +332,10 @@ private fun EpisodeScreenLayoutPreview() {
         MovieScreenLayout(
             state = MovieState(movie = dummyMovie, videoMetadata = dummyVideoMetadata),
             downloaderState = DownloaderState(),
+            issueReporterState = IssueReporterState(),
             onAction = {},
             onDownloaderAction = {},
+            onReportIssueClick = {},
         )
     }
 }

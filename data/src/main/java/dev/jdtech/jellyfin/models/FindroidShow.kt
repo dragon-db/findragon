@@ -31,6 +31,7 @@ data class FindroidShow(
     val trailer: String?,
     override val images: FindroidImages,
     override val chapters: List<FindroidChapter> = emptyList(),
+    val tmdbId: Int? = null,
 ) : FindroidItem
 
 fun BaseItemDto.toFindroidShow(jellyfinRepository: JellyfinRepository): FindroidShow {
@@ -56,6 +57,7 @@ fun BaseItemDto.toFindroidShow(jellyfinRepository: JellyfinRepository): Findroid
         endDate = endDate,
         trailer = remoteTrailers?.getOrNull(0)?.url,
         images = toFindroidImages(jellyfinRepository),
+        tmdbId = providerIds?.tmdbId(),
     )
 }
 

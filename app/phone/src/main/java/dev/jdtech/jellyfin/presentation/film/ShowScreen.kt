@@ -42,10 +42,14 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.jdtech.jellyfin.PlayerActivity
 import dev.jdtech.jellyfin.core.R as CoreR
+import dev.jdtech.jellyfin.data.BuildConfig as DataBuildConfig
 import dev.jdtech.jellyfin.core.presentation.dummy.dummyShow
 import dev.jdtech.jellyfin.film.presentation.show.ShowAction
 import dev.jdtech.jellyfin.film.presentation.show.ShowState
 import dev.jdtech.jellyfin.film.presentation.show.ShowViewModel
+import dev.jdtech.jellyfin.film.presentation.issue.IssueReporterEvent
+import dev.jdtech.jellyfin.film.presentation.issue.IssueReporterState
+import dev.jdtech.jellyfin.film.presentation.issue.IssueReporterViewModel
 import dev.jdtech.jellyfin.models.FindroidItem
 import dev.jdtech.jellyfin.presentation.film.components.ActorsRow
 import dev.jdtech.jellyfin.presentation.film.components.Direction
@@ -55,10 +59,12 @@ import dev.jdtech.jellyfin.presentation.film.components.ItemCard
 import dev.jdtech.jellyfin.presentation.film.components.ItemHeader
 import dev.jdtech.jellyfin.presentation.film.components.ItemPoster
 import dev.jdtech.jellyfin.presentation.film.components.ItemTopBar
+import dev.jdtech.jellyfin.presentation.film.components.IssueReporterDialogs
 import dev.jdtech.jellyfin.presentation.film.components.OverviewText
 import dev.jdtech.jellyfin.presentation.theme.FindroidTheme
 import dev.jdtech.jellyfin.presentation.theme.spacings
 import dev.jdtech.jellyfin.presentation.utils.rememberSafePadding
+import dev.jdtech.jellyfin.utils.ObserveAsEvents
 import dev.jdtech.jellyfin.utils.getShowDateString
 import java.util.UUID
 import org.jellyfin.sdk.model.api.BaseItemKind
@@ -71,16 +77,33 @@ fun ShowScreen(
     navigateToItem: (item: FindroidItem) -> Unit,
     navigateToPerson: (personId: UUID) -> Unit,
     viewModel: ShowViewModel = hiltViewModel(),
+    issueReporterViewModel: IssueReporterViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
+    val isIssueReportingEnabled = DataBuildConfig.JELLYSEERR_BASE_URL.isNotBlank()
 
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val issueReporterState by issueReporterViewModel.state.collectAsStateWithLifecycle()
 
     LaunchedEffect(true) { viewModel.loadShow(showId = showId) }
 
+    LaunchedEffect(state.show, isIssueReportingEnabled) {
+        if (isIssueReportingEnabled) {
+            state.show?.let(issueReporterViewModel::loadForShow)
+        }
+    }
+
+    ObserveAsEvents(issueReporterViewModel.events) { event ->
+        when (event) {
+            is IssueReporterEvent.Message ->
+                Toast.makeText(context, event.message, Toast.LENGTH_SHORT).show()
+        }
+    }
+
     ShowScreenLayout(
         state = state,
+        issueReporterState = issueReporterState,
         onAction = { action ->
             when (action) {
                 is ShowAction.Play -> {
@@ -104,11 +127,32 @@ fun ShowScreen(
             }
             viewModel.onAction(action)
         },
+        onReportIssueClick =
+            if (isIssueReportingEnabled) {
+                { issueReporterViewModel.onIssueButtonClick() }
+            } else {
+                null
+            },
     )
+
+    if (isIssueReportingEnabled) {
+        IssueReporterDialogs(
+            state = issueReporterState,
+            onIssueClick = issueReporterViewModel::onIssueSelected,
+            onReportNewClick = issueReporterViewModel::onReportNewClick,
+            onSubmit = issueReporterViewModel::submit,
+            onDismiss = issueReporterViewModel::dismissDialogs,
+        )
+    }
 }
 
 @Composable
-private fun ShowScreenLayout(state: ShowState, onAction: (ShowAction) -> Unit) {
+private fun ShowScreenLayout(
+    state: ShowState,
+    issueReporterState: IssueReporterState,
+    onAction: (ShowAction) -> Unit,
+    onReportIssueClick: (() -> Unit)?,
+) {
     val safePadding = rememberSafePadding()
 
     val paddingStart = safePadding.start + MaterialTheme.spacings.default
@@ -207,6 +251,9 @@ private fun ShowScreenLayout(state: ShowState, onAction: (ShowAction) -> Unit) {
                         onDownloadClick = {},
                         onDownloadCancelClick = {},
                         onDownloadDeleteClick = {},
+                        onReportIssueClick = onReportIssueClick,
+                        issueCount = issueReporterState.issueCount,
+                        issueEnabled = issueReporterState.canReport,
                         modifier = Modifier.fillMaxWidth(),
                         canPlay = state.seasons.isNotEmpty(),
                     )
@@ -300,5 +347,12 @@ private fun ShowScreenLayout(state: ShowState, onAction: (ShowAction) -> Unit) {
 @PreviewScreenSizes
 @Composable
 private fun EpisodeScreenLayoutPreview() {
-    FindroidTheme { ShowScreenLayout(state = ShowState(show = dummyShow), onAction = {}) }
+    FindroidTheme {
+        ShowScreenLayout(
+            state = ShowState(show = dummyShow),
+            issueReporterState = IssueReporterState(),
+            onAction = {},
+            onReportIssueClick = {},
+        )
+    }
 }

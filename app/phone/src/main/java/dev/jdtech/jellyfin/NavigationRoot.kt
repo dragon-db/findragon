@@ -20,6 +20,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.navigation.NavHostController
 import androidx.navigation.NavOptions
@@ -31,6 +32,8 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.toRoute
 import androidx.window.core.layout.WindowSizeClass
 import dev.jdtech.jellyfin.core.R as CoreR
+import dev.jdtech.jellyfin.data.BuildConfig as DataBuildConfig
+import dev.jdtech.jellyfin.film.presentation.explore.ExploreViewModel
 import dev.jdtech.jellyfin.models.CollectionType
 import dev.jdtech.jellyfin.models.FindroidBoxSet
 import dev.jdtech.jellyfin.models.FindroidCollection
@@ -43,6 +46,8 @@ import dev.jdtech.jellyfin.models.FindroidShow
 import dev.jdtech.jellyfin.presentation.film.CollectionScreen
 import dev.jdtech.jellyfin.presentation.film.DownloadsScreen
 import dev.jdtech.jellyfin.presentation.film.EpisodeScreen
+import dev.jdtech.jellyfin.presentation.film.ExploreDetailScreen
+import dev.jdtech.jellyfin.presentation.film.ExploreScreen
 import dev.jdtech.jellyfin.presentation.film.FavoritesScreen
 import dev.jdtech.jellyfin.presentation.film.HomeScreen
 import dev.jdtech.jellyfin.presentation.film.LibraryScreen
@@ -76,6 +81,10 @@ import kotlinx.serialization.Serializable
 @Serializable data class LoginRoute(val username: String? = null)
 
 @Serializable data object HomeRoute
+
+@Serializable data object ExploreRoute
+
+@Serializable data class ExploreDetailRoute(val tmdbId: Int, val mediaType: String)
 
 @Serializable data object MediaRoute
 
@@ -121,6 +130,12 @@ val mediaTab =
         icon = CoreR.drawable.ic_library,
         route = MediaRoute,
     )
+val exploreTab =
+    TabBarItem(
+        title = R.string.title_explore,
+        icon = CoreR.drawable.ic_sparkles,
+        route = ExploreRoute,
+    )
 val downloadsTab =
     TabBarItem(
         title = CoreR.string.title_download,
@@ -147,7 +162,12 @@ fun NavigationRoot(
 
     val navigationItems =
         when (isOfflineMode) {
-            false -> listOf(homeTab, mediaTab, downloadsTab)
+            false ->
+                if (DataBuildConfig.JELLYSEERR_BASE_URL.isNotBlank()) {
+                    listOf(homeTab, exploreTab, mediaTab, downloadsTab)
+                } else {
+                    listOf(homeTab, mediaTab, downloadsTab)
+                }
             true -> listOf(homeTab, downloadsTab)
         }
     val navigationItemClassNames = navigationItems.map { it.route::class.qualifiedName }
@@ -223,7 +243,10 @@ fun NavigationRoot(
             exitTransition = { fadeOut(tween(300)) },
         ) {
             composable<WelcomeRoute> {
-                WelcomeScreen(onContinueClick = { navController.safeNavigate(ServersRoute) })
+                WelcomeScreen(
+                    navigateToUsers = { navController.safeNavigate(UsersRoute) },
+                    onAddServerClick = { navController.safeNavigate(AddServerRoute) },
+                )
             }
             composable<ServersRoute> {
                 ServersScreen(
@@ -313,6 +336,42 @@ fun NavigationRoot(
                     onItemClick = { item ->
                         navigateToItem(navController = navController, item = item)
                     },
+                )
+            }
+            composable<ExploreRoute> {
+                val exploreBackStackEntry =
+                    remember(navController) {
+                        navController.getBackStackEntry(ExploreRoute::class.qualifiedName!!)
+                    }
+                val exploreViewModel: ExploreViewModel = hiltViewModel(exploreBackStackEntry)
+                ExploreScreen(
+                    onItemClick = { item ->
+                        navigateToItem(navController = navController, item = item)
+                    },
+                    onMediaClick = { media ->
+                        navController.safeNavigate(
+                            ExploreDetailRoute(
+                                tmdbId = media.tmdbId,
+                                mediaType = media.mediaType.apiValue,
+                            )
+                        )
+                    },
+                    viewModel = exploreViewModel,
+                )
+            }
+            composable<ExploreDetailRoute> { backStackEntry ->
+                val route: ExploreDetailRoute = backStackEntry.toRoute()
+                val exploreBackStackEntry =
+                    remember(navController) {
+                        navController.getBackStackEntry(ExploreRoute::class.qualifiedName!!)
+                    }
+                val exploreViewModel: ExploreViewModel = hiltViewModel(exploreBackStackEntry)
+                ExploreDetailScreen(
+                    tmdbId = route.tmdbId,
+                    mediaType = route.mediaType,
+                    navigateBack = { navController.safePopBackStack() },
+                    onItemClick = { item -> navigateToItem(navController = navController, item = item) },
+                    viewModel = exploreViewModel,
                 )
             }
             composable<MediaRoute> {
