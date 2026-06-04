@@ -7,6 +7,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.jdtech.jellyfin.settings.R
+import dev.jdtech.jellyfin.settings.domain.AccountDetailsRepository
+import dev.jdtech.jellyfin.settings.domain.AccountDetailsResult
 import dev.jdtech.jellyfin.settings.domain.AppPreferences
 import dev.jdtech.jellyfin.settings.presentation.enums.DeviceType
 import dev.jdtech.jellyfin.settings.presentation.models.PreferenceAppLanguage
@@ -25,8 +27,12 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 
 @HiltViewModel
-class SettingsViewModel @Inject constructor(private val appPreferences: AppPreferences) :
-    ViewModel() {
+class SettingsViewModel
+@Inject
+constructor(
+    private val appPreferences: AppPreferences,
+    private val accountDetailsRepository: AccountDetailsRepository,
+) : ViewModel() {
     private val _state = MutableStateFlow(SettingsState())
     val state = _state.asStateFlow()
 
@@ -711,7 +717,11 @@ class SettingsViewModel @Inject constructor(private val appPreferences: AppPrefe
             ),
         )
 
-    fun loadPreferences(indexes: IntArray = intArrayOf(), deviceType: DeviceType) {
+    fun loadPreferences(
+        indexes: IntArray = intArrayOf(),
+        deviceType: DeviceType,
+        loadAccountDetails: Boolean = false,
+    ) {
         viewModelScope.launch {
             var preferences = topLevelPreferences
 
@@ -813,7 +823,43 @@ class SettingsViewModel @Inject constructor(private val appPreferences: AppPrefe
                     }
                     .filter { it.preferences.isNotEmpty() }
 
-            _state.emit(_state.value.copy(preferenceGroups = preferences))
+            val shouldLoadAccountDetails =
+                deviceType == DeviceType.PHONE && loadAccountDetails
+            _state.emit(
+                _state.value.copy(
+                    preferenceGroups = preferences,
+                    accountDetails = if (shouldLoadAccountDetails) _state.value.accountDetails else null,
+                    isAccountDetailsLoading = shouldLoadAccountDetails,
+                    accountDetailsError = null,
+                )
+            )
+
+            if (shouldLoadAccountDetails) {
+                loadAccountDetails()
+            }
+        }
+    }
+
+    private fun loadAccountDetails() {
+        viewModelScope.launch {
+            when (val result = accountDetailsRepository.getAccountDetails()) {
+                is AccountDetailsResult.Success ->
+                    _state.emit(
+                        _state.value.copy(
+                            accountDetails = result.details,
+                            isAccountDetailsLoading = false,
+                            accountDetailsError = null,
+                        )
+                    )
+                is AccountDetailsResult.Failure ->
+                    _state.emit(
+                        _state.value.copy(
+                            accountDetails = null,
+                            isAccountDetailsLoading = false,
+                            accountDetailsError = result.message,
+                        )
+                    )
+            }
         }
     }
 

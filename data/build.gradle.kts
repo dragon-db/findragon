@@ -42,6 +42,7 @@ fun buildConfigString(value: String): String {
 }
 
 val jellyseerrBaseUrl = privateUrlProperty("JELLYSEERR_BASE_URL")
+val jfaGoBaseUrl = privateUrlProperty("JFA_GO_BASE_URL")
 
 android {
     namespace = "dev.jdtech.jellyfin.data"
@@ -54,6 +55,7 @@ android {
         buildConfigField("int", "VERSION_CODE", Versions.APP_CODE.toString())
         buildConfigField("String", "VERSION_NAME", "\"${Versions.APP_NAME}\"")
         buildConfigField("String", "JELLYSEERR_BASE_URL", buildConfigString(jellyseerrBaseUrl))
+        buildConfigField("String", "JFA_GO_BASE_URL", buildConfigString(jfaGoBaseUrl))
 
         consumerProguardFile("proguard-rules.pro")
 
