@@ -254,6 +254,7 @@ private fun ShowScreenLayout(
                         onReportIssueClick = onReportIssueClick,
                         issueCount = issueReporterState.issueCount,
                         issueEnabled = issueReporterState.canReport,
+                        issueLoading = issueReporterState.isLoading,
                         modifier = Modifier.fillMaxWidth(),
                         canPlay = state.seasons.isNotEmpty(),
                     )

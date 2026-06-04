@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
@@ -56,6 +58,7 @@ fun ItemButtonsBar(
     onReportIssueClick: (() -> Unit)? = null,
     issueCount: Int = 0,
     issueEnabled: Boolean = true,
+    issueLoading: Boolean = false,
 ) {
     val context = LocalContext.current
     val windowSizeClass = currentWindowAdaptiveInfo().windowSizeClass
@@ -159,29 +162,45 @@ fun ItemButtonsBar(
                 }
                 onReportIssueClick?.let { reportIssue ->
                     val hasOpenIssue = issueCount > 0
-                    FilledTonalIconButton(
-                        onClick = reportIssue,
-                        enabled = issueEnabled,
-                        colors =
-                            if (hasOpenIssue) {
+                    val issueButtonColors =
+                        when {
+                            issueLoading ->
+                                IconButtonDefaults.filledTonalIconButtonColors(
+                                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    disabledContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                    disabledContentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                                )
+                            hasOpenIssue ->
                                 IconButtonDefaults.filledTonalIconButtonColors(
                                     containerColor = MaterialTheme.colorScheme.errorContainer,
                                     contentColor = MaterialTheme.colorScheme.onErrorContainer,
                                 )
-                            } else {
-                                IconButtonDefaults.filledTonalIconButtonColors()
-                            },
+                            else -> IconButtonDefaults.filledTonalIconButtonColors()
+                        }
+                    FilledTonalIconButton(
+                        onClick = reportIssue,
+                        enabled = issueEnabled && !issueLoading,
+                        colors = issueButtonColors,
                     ) {
-                        Icon(
-                            painter = painterResource(CoreR.drawable.ic_alert_circle),
-                            contentDescription = null,
-                            tint =
-                                if (hasOpenIssue) {
-                                    MaterialTheme.colorScheme.onErrorContainer
-                                } else {
-                                    LocalContentColor.current
-                                },
-                        )
+                        if (issueLoading) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                strokeWidth = 2.dp,
+                            )
+                        } else {
+                            Icon(
+                                painter = painterResource(CoreR.drawable.ic_alert_circle),
+                                contentDescription = null,
+                                tint =
+                                    if (hasOpenIssue) {
+                                        MaterialTheme.colorScheme.onErrorContainer
+                                    } else {
+                                        LocalContentColor.current
+                                    },
+                            )
+                        }
                     }
                 }
                 if (downloaderState != null && !downloaderState.isDownloading) {
