@@ -420,7 +420,7 @@ class ExploreViewModel @Inject constructor(private val repository: JellyseerrRep
                 eventsChannel.send(
                     ExploreEvent.ShowMessage(
                         e.message
-                            ?: "Findroid could not open this title from Jellyfin."
+                            ?: "Findragon could not open this title from Jellyfin."
                     )
                 )
             }
