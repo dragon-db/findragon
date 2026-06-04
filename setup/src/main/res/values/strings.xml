@@ -24,7 +24,7 @@
    <string name="welcome">Welcome</string>
    <string name="welcome_btn_continue">Continue</string>
    <string name="welcome_btn_learn_more">Learn more about Jellyfin</string>
-    <string name="welcome_text">This build is a DragonDB-focused fork of Findroid. It does not contain any media.\n\nDragonDB users can continue directly to sign in without entering a server address manually.</string>
+    <string name="welcome_text">This is a DragonDB-focused Jellyfin client. It does not contain any media.\n\nDragonDB users can continue directly to sign in without entering a server address manually.</string>
     <string name="confirm">Confirm</string>
     <string name="cancel">Cancel</string>
     <string name="or">OR</string>
