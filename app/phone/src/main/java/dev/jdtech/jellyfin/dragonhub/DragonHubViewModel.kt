@@ -10,6 +10,7 @@ import dev.jdtech.jellyfin.dragonhub.api.dto.DragonHubNotificationDto
 import dev.jdtech.jellyfin.dragonhub.api.dto.DragonHubVersionResponseDto
 import dev.jdtech.jellyfin.settings.domain.AppPreferences
 import java.time.LocalDateTime
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -17,6 +18,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import timber.log.Timber
 
 @HiltViewModel
 class DragonHubViewModel
@@ -29,28 +31,43 @@ constructor(
     private val _state = MutableStateFlow(DragonHubState())
     val state = _state.asStateFlow()
 
-    private var hasChecked = false
+    private val hasChecked = AtomicBoolean(false)
 
     fun check() {
-        if (hasChecked || DataBuildConfig.DRAGON_HUB_URL.isBlank()) return
-        hasChecked = true
+        if (DataBuildConfig.DRAGON_HUB_URL.isBlank() || !hasChecked.compareAndSet(false, true)) {
+            return
+        }
 
         viewModelScope.launch {
-            val update =
-                apiService.getVersion()?.takeIf {
-                    DragonHubUpdatePolicy.isUpdateAvailable(it.versionCode)
-                }
-            val notifications =
-                currentUsername()?.let { username ->
-                    apiService.getNotifications(username)?.notifications.orEmpty().latestFirst()
-                } ?: emptyList()
+            try {
+                val update =
+                    apiService.getVersion()?.takeIf {
+                        DragonHubUpdatePolicy.isUpdateAvailable(it.versionCode)
+                    }
+                val notifications =
+                    currentUsername()?.let { username ->
+                        apiService.getNotifications(username)?.notifications.orEmpty().latestFirst()
+                    } ?: emptyList()
 
-            _state.update {
-                it.copy(
-                    update = update,
-                    notifications = notifications,
-                    showNotifications = notifications.isNotEmpty(),
-                )
+                _state.update {
+                    it.copy(
+                        update = update,
+                        notifications = notifications,
+                        showNotifications = notifications.isNotEmpty(),
+                        error = null,
+                    )
+                }
+            } catch (e: Exception) {
+                Timber.w(e, "Dragon Hub check failed.")
+                hasChecked.set(false)
+                _state.update {
+                    it.copy(
+                        update = null,
+                        notifications = emptyList(),
+                        showNotifications = false,
+                        error = "Dragon Hub check failed.",
+                    )
+                }
             }
         }
     }
@@ -71,10 +88,20 @@ constructor(
         }
 
     private fun List<DragonHubNotificationDto>.latestFirst(): List<DragonHubNotificationDto> {
-        return sortedWith(
-            compareByDescending<DragonHubNotificationDto> { parseCreatedAt(it.createdAt) }
-                .thenByDescending { it.id }
-        )
+        return sortedWith { left, right ->
+            val leftCreatedAt = parseCreatedAt(left.createdAt)
+            val rightCreatedAt = parseCreatedAt(right.createdAt)
+
+            when {
+                leftCreatedAt != null && rightCreatedAt != null -> {
+                    val dateComparison = rightCreatedAt.compareTo(leftCreatedAt)
+                    if (dateComparison != 0) dateComparison else right.id.compareTo(left.id)
+                }
+                leftCreatedAt != null -> -1
+                rightCreatedAt != null -> 1
+                else -> right.id.compareTo(left.id)
+            }
+        }
     }
 
     private fun parseCreatedAt(createdAt: String): LocalDateTime? {
@@ -86,4 +113,5 @@ data class DragonHubState(
     val update: DragonHubVersionResponseDto? = null,
     val notifications: List<DragonHubNotificationDto> = emptyList(),
     val showNotifications: Boolean = false,
+    val error: String? = null,
 )

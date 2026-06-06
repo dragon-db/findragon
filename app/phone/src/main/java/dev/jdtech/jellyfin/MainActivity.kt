@@ -22,6 +22,7 @@ import dev.jdtech.jellyfin.presentation.dragonhub.UpdateAvailableDialog
 import dev.jdtech.jellyfin.presentation.theme.FindroidTheme
 import dev.jdtech.jellyfin.presentation.utils.LocalOfflineMode
 import dev.jdtech.jellyfin.viewmodels.MainViewModel
+import timber.log.Timber
 
 @AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
@@ -62,7 +63,10 @@ class MainActivity : AppCompatActivity() {
                         update = update,
                         onUpdateClick = {
                             val launched = context.openHttpUrl(update.apkUrl)
-                            if (!update.forceUpdate || launched) {
+                            if (!launched) {
+                                Timber.w("Failed to launch Dragon Hub update URL: ${update.apkUrl}")
+                                dragonHubViewModel.dismissUpdate()
+                            } else if (!update.forceUpdate) {
                                 dragonHubViewModel.dismissUpdate()
                             }
                         },
