@@ -80,4 +80,13 @@
     <string name="issue_all_episodes">All Episodes</string>
     <string name="issue_message_label">What\'s wrong?</string>
     <string name="issue_message_placeholder">Please provide a detailed explanation of the issue you encountered.</string>
+    <string name="update_available_title">App Update Available</string>
+    <string name="update_available_version">Version %1$s is available.</string>
+    <string name="update_available_update_now">Update Now</string>
+    <string name="update_available_later">Later</string>
+    <string name="dragon_hub_notifications_title">Notifications</string>
+    <string name="dragon_hub_notifications_count_single">%1$d notification</string>
+    <string name="dragon_hub_notifications_count_multiple">%1$d notifications</string>
+    <string name="dragon_hub_notifications_close">Close</string>
+    <string name="dragon_hub_notifications_dismiss">Dismiss</string>
 </resources>
