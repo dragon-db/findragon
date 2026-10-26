@@ -2,9 +2,16 @@
 .gradle/
 .gradle-user/
 build/
+**/build/
 
 # Local configuration file (sdk path, etc)
 local.properties
+
+# Local secrets/env overrides
+.env
+.env.*
+!.env.example
+!.env.*.example
 
 # Local-only implementation notes that may reference private deployments
 /docs/private/
@@ -17,7 +24,10 @@ captures/
 .externalNativeBuild/
 .cxx/
 *.apk
+*.aab
 output.json
+output-metadata.json
+/app/phone/libre/
 
 # IntelliJ
 *.iml
