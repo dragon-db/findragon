@@ -3,18 +3,17 @@
 .gradle-user/
 build/
 **/build/
+.kotlin/
 
 # Local configuration file (sdk path, etc)
 local.properties
 
-# Local secrets/env overrides
-.env
-.env.*
-!.env.example
-!.env.*.example
+# Findragon private infra config (template: findragon.properties.example)
+findragon.properties
 
-# Local-only implementation notes that may reference private deployments
-/docs/private/
+# Local-only fork docs and agent notes (may reference private deployments)
+/docs/
+/AGENTS.md
 
 # Log/OS Files
 *.log

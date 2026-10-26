@@ -1,6 +1,6 @@
 package dev.jdtech.jellyfin.setup.presentation.welcome
 
-import dev.jdtech.jellyfin.setup.BuildConfig
+import dev.jdtech.jellyfin.findragon.FindragonConfig
 
 interface DefaultServerConfig {
     val serverUrl: String
@@ -8,5 +8,5 @@ interface DefaultServerConfig {
 
 class BuildConfigDefaultServerConfig : DefaultServerConfig {
     override val serverUrl: String
-        get() = BuildConfig.DEFAULT_SERVER_URL
+        get() = FindragonConfig.defaultServerUrl
 }

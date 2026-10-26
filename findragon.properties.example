@@ -1,0 +1,24 @@
+# Findragon infra config template.
+#
+# Copy this file to `findragon.properties` (same folder) and fill in real values.
+# `findragon.properties` is git-ignored: real infra URLs must never be committed.
+#
+# FINDRAGON_INFRA=true  -> the URLs below are baked into the APK. Every key is required and
+#                          must be an https URL, otherwise the build stops with an error.
+# FINDRAGON_INFRA=false -> (or file missing) plain fork build, all DragonDB integrations off.
+#
+# One-off override from the command line: ./gradlew assembleLibreDebug -PFINDRAGON_INFRA=false
+
+FINDRAGON_INFRA=true
+
+# Jellyfin server used by the one-tap "Continue" on the welcome screen.
+DEFAULT_SERVER_URL=https://jellyfin.example.invalid
+
+# Seerr / Jellyseerr: Explore tab, requests, issue reporting.
+JELLYSEERR_BASE_URL=https://requests.example.invalid
+
+# JFA-GO: account card (email, expiry) in Settings.
+JFA_GO_BASE_URL=https://accounts.example.invalid
+
+# Dragon Hub: update prompts and user notifications on app start.
+DRAGON_HUB_URL=https://hub.example.invalid

@@ -1,8 +1,8 @@
 package dev.jdtech.jellyfin.dragonhub.api
 
-import dev.jdtech.jellyfin.data.BuildConfig
 import dev.jdtech.jellyfin.dragonhub.api.dto.DragonHubNotificationsResponseDto
 import dev.jdtech.jellyfin.dragonhub.api.dto.DragonHubVersionResponseDto
+import dev.jdtech.jellyfin.findragon.FindragonConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.decodeFromString
@@ -16,7 +16,7 @@ import okhttp3.Response
 class DragonHubApiService(
     private val okHttpClient: OkHttpClient,
     private val json: Json,
-    private val baseUrl: String = BuildConfig.DRAGON_HUB_URL,
+    private val baseUrl: String = FindragonConfig.dragonHubUrl,
 ) {
     suspend fun getVersion(): DragonHubVersionResponseDto? {
         return get("api/version")

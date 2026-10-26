@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Findragon-only strings. Kept out of upstream's strings.xml so upstream merges never conflict. -->
+<resources>
+    <string name="welcome_btn_add_server_manually">Add server manually</string>
+</resources>

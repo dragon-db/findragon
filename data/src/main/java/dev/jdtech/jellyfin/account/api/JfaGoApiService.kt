@@ -2,7 +2,7 @@ package dev.jdtech.jellyfin.account.api
 
 import dev.jdtech.jellyfin.account.api.dto.JfaGoMyDetailsDto
 import dev.jdtech.jellyfin.account.api.dto.JfaGoTokenDto
-import dev.jdtech.jellyfin.data.BuildConfig
+import dev.jdtech.jellyfin.findragon.FindragonConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.decodeFromString
@@ -17,7 +17,7 @@ import okhttp3.Response
 class JfaGoApiService(
     private val okHttpClient: OkHttpClient,
     private val json: Json,
-    private val baseUrl: String = BuildConfig.JFA_GO_BASE_URL,
+    private val baseUrl: String = FindragonConfig.jfaGoBaseUrl,
 ) {
     suspend fun login(username: String, password: String): JfaGoTokenDto =
         withContext(Dispatchers.IO) {

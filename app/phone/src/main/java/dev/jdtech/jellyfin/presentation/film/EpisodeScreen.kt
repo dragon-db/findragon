@@ -39,7 +39,6 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.jdtech.jellyfin.PlayerActivity
 import dev.jdtech.jellyfin.core.R as CoreR
-import dev.jdtech.jellyfin.data.BuildConfig as DataBuildConfig
 import dev.jdtech.jellyfin.core.presentation.downloader.DownloaderAction
 import dev.jdtech.jellyfin.core.presentation.downloader.DownloaderEvent
 import dev.jdtech.jellyfin.core.presentation.downloader.DownloaderState
@@ -52,6 +51,7 @@ import dev.jdtech.jellyfin.film.presentation.episode.EpisodeViewModel
 import dev.jdtech.jellyfin.film.presentation.issue.IssueReporterEvent
 import dev.jdtech.jellyfin.film.presentation.issue.IssueReporterState
 import dev.jdtech.jellyfin.film.presentation.issue.IssueReporterViewModel
+import dev.jdtech.jellyfin.findragon.FindragonConfig
 import dev.jdtech.jellyfin.presentation.film.components.ActorsRow
 import dev.jdtech.jellyfin.presentation.film.components.ExtraInfoText
 import dev.jdtech.jellyfin.presentation.film.components.ItemButtonsBar
@@ -82,7 +82,7 @@ fun EpisodeScreen(
 ) {
     val context = LocalContext.current
     val isOfflineMode = LocalOfflineMode.current
-    val isIssueReportingEnabled = DataBuildConfig.JELLYSEERR_BASE_URL.isNotBlank()
+    val isIssueReportingEnabled = FindragonConfig.isSeerrEnabled
 
     val state by viewModel.state.collectAsStateWithLifecycle()
     val downloaderState by downloaderViewModel.state.collectAsStateWithLifecycle()

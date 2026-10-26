@@ -20,8 +20,8 @@ object AccountDetailsModule {
     @Singleton
     @Provides
     fun provideJfaGoApiService(
-        okHttpClient: OkHttpClient,
-        json: Json,
+        @FindragonHttp okHttpClient: OkHttpClient,
+        @FindragonHttp json: Json,
     ): JfaGoApiService {
         return JfaGoApiService(okHttpClient, json)
     }

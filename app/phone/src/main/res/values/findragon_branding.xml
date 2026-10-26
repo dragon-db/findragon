@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Findragon branding. App-module resources override the same names in library modules
+    (core, setup), for both debug and release builds, so upstream's files stay untouched.
+    Keep in sync with app/tv/src/main/res/values/findragon_branding.xml.
+-->
+<resources>
+    <string name="app_name" translatable="false">Findragon</string>
+    <string name="app_description">DragonDB-focused Jellyfin client fork</string>
+    <string name="privacy_policy_notice">By using this fork you agree with the Privacy Policy. This build does not collect any data.</string>
+    <string name="welcome">Welcome</string>
+    <string name="welcome_text">This is a DragonDB-focused Jellyfin client. It does not contain any media.\n\nDragonDB users can continue directly to sign in without entering a server address manually.</string>
+
+    <color name="logo_primary">#8313EB</color>
+    <color name="logo_secondary">#F902FB</color>
+</resources>
