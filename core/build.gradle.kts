@@ -49,4 +49,6 @@ dependencies {
     implementation(libs.material)
     implementation(libs.okhttp)
     implementation(libs.timber)
+    implementation(libs.slf4j.api)
+    implementation(libs.slf4j.android)
 }
