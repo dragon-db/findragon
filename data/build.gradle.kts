@@ -1,52 +1,8 @@
-import java.net.URI
-import java.util.Properties
-
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
 }
-
-val localProperties =
-    Properties().apply {
-        val localPropertiesFile = rootProject.file("local.properties")
-        if (localPropertiesFile.exists()) {
-            localPropertiesFile.inputStream().use(::load)
-        }
-    }
-
-fun privateUrlProperty(name: String): String {
-    val value =
-        (providers.gradleProperty(name).orNull ?: localProperties.getProperty(name).orEmpty())
-            .trim()
-            .removeSurrounding("\"")
-            .removeSurrounding("'")
-            .trim()
-            .trimEnd('/')
-    if (value.isEmpty()) {
-        return ""
-    }
-
-    val uri =
-        runCatching { URI(value) }
-            .getOrElse { throw GradleException("$name must be a valid HTTP or HTTPS URL.") }
-    if (
-        uri.scheme !in setOf("http", "https") ||
-            uri.host.isNullOrBlank() ||
-            uri.userInfo != null
-    ) {
-        throw GradleException("$name must be a valid HTTP or HTTPS URL without credentials.")
-    }
-    return value
-}
-
-fun buildConfigString(value: String): String {
-    return "\"${value.replace("\\", "\\\\").replace("\"", "\\\"")}\""
-}
-
-val jellyseerrBaseUrl = privateUrlProperty("JELLYSEERR_BASE_URL")
-val jfaGoBaseUrl = privateUrlProperty("JFA_GO_BASE_URL")
-val dragonHubBaseUrl = privateUrlProperty("DRAGON_HUB_URL")
 
 android {
     namespace = "dev.jdtech.jellyfin.data"
@@ -56,11 +12,11 @@ android {
     defaultConfig {
         minSdk = Versions.MIN_SDK
 
-        buildConfigField("int", "VERSION_CODE", Versions.APP_CODE.toString())
-        buildConfigField("String", "VERSION_NAME", "\"${Versions.APP_NAME}\"")
-        buildConfigField("String", "JELLYSEERR_BASE_URL", buildConfigString(jellyseerrBaseUrl))
-        buildConfigField("String", "JFA_GO_BASE_URL", buildConfigString(jfaGoBaseUrl))
-        buildConfigField("String", "DRAGON_HUB_URL", buildConfigString(dragonHubBaseUrl))
+        buildConfigField("int", "VERSION_CODE", FindragonVersions.APP_CODE.toString())
+        buildConfigField("String", "VERSION_NAME", "\"${FindragonVersions.APP_NAME}\"")
+        FindragonBuildConfig.buildConfigFields(project).forEach { (type, name, value) ->
+            buildConfigField(type, name, value)
+        }
 
         consumerProguardFile("proguard-rules.pro")
 

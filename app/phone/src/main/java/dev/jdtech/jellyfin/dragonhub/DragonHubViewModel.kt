@@ -3,11 +3,11 @@ package dev.jdtech.jellyfin.dragonhub
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
-import dev.jdtech.jellyfin.data.BuildConfig as DataBuildConfig
 import dev.jdtech.jellyfin.database.ServerDatabaseDao
 import dev.jdtech.jellyfin.dragonhub.api.DragonHubApiService
 import dev.jdtech.jellyfin.dragonhub.api.dto.DragonHubNotificationDto
 import dev.jdtech.jellyfin.dragonhub.api.dto.DragonHubVersionResponseDto
+import dev.jdtech.jellyfin.findragon.FindragonConfig
 import dev.jdtech.jellyfin.settings.domain.AppPreferences
 import java.time.LocalDateTime
 import java.util.concurrent.atomic.AtomicBoolean
@@ -34,7 +34,7 @@ constructor(
     private val hasChecked = AtomicBoolean(false)
 
     fun check() {
-        if (DataBuildConfig.DRAGON_HUB_URL.isBlank() || !hasChecked.compareAndSet(false, true)) {
+        if (!FindragonConfig.isDragonHubEnabled || !hasChecked.compareAndSet(false, true)) {
             return
         }
 

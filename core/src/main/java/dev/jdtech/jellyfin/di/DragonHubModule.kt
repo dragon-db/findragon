@@ -15,8 +15,8 @@ object DragonHubModule {
     @Singleton
     @Provides
     fun provideDragonHubApiService(
-        okHttpClient: OkHttpClient,
-        json: Json,
+        @FindragonHttp okHttpClient: OkHttpClient,
+        @FindragonHttp json: Json,
     ): DragonHubApiService {
         return DragonHubApiService(okHttpClient, json)
     }

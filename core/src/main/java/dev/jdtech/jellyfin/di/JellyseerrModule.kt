@@ -20,6 +20,7 @@ import okhttp3.OkHttpClient
 object JellyseerrModule {
     @Singleton
     @Provides
+    @FindragonHttp
     fun provideJellyseerrJson(): Json {
         return Json {
             encodeDefaults = true
@@ -30,6 +31,7 @@ object JellyseerrModule {
 
     @Singleton
     @Provides
+    @FindragonHttp
     fun provideJellyseerrOkHttpClient(): OkHttpClient {
         return OkHttpClient()
     }
@@ -37,8 +39,8 @@ object JellyseerrModule {
     @Singleton
     @Provides
     fun provideJellyseerrApiService(
-        okHttpClient: OkHttpClient,
-        json: Json,
+        @FindragonHttp okHttpClient: OkHttpClient,
+        @FindragonHttp json: Json,
     ): JellyseerrApiService {
         return JellyseerrApiService(okHttpClient, json)
     }

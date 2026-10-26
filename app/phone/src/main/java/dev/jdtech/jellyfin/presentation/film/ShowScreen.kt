@@ -42,7 +42,6 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.jdtech.jellyfin.PlayerActivity
 import dev.jdtech.jellyfin.core.R as CoreR
-import dev.jdtech.jellyfin.data.BuildConfig as DataBuildConfig
 import dev.jdtech.jellyfin.core.presentation.dummy.dummyShow
 import dev.jdtech.jellyfin.film.presentation.show.ShowAction
 import dev.jdtech.jellyfin.film.presentation.show.ShowState
@@ -50,6 +49,7 @@ import dev.jdtech.jellyfin.film.presentation.show.ShowViewModel
 import dev.jdtech.jellyfin.film.presentation.issue.IssueReporterEvent
 import dev.jdtech.jellyfin.film.presentation.issue.IssueReporterState
 import dev.jdtech.jellyfin.film.presentation.issue.IssueReporterViewModel
+import dev.jdtech.jellyfin.findragon.FindragonConfig
 import dev.jdtech.jellyfin.models.FindroidItem
 import dev.jdtech.jellyfin.presentation.film.components.ActorsRow
 import dev.jdtech.jellyfin.presentation.film.components.Direction
@@ -81,7 +81,7 @@ fun ShowScreen(
 ) {
     val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
-    val isIssueReportingEnabled = DataBuildConfig.JELLYSEERR_BASE_URL.isNotBlank()
+    val isIssueReportingEnabled = FindragonConfig.isSeerrEnabled
 
     val state by viewModel.state.collectAsStateWithLifecycle()
     val issueReporterState by issueReporterViewModel.state.collectAsStateWithLifecycle()

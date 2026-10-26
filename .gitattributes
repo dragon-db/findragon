@@ -1,0 +1,4 @@
+# Fork-owned files: on upstream merges always keep the Findragon version.
+# Needs a one-time local setup: git config merge.ours.driver true
+README.md merge=ours
+PRIVACY merge=ours

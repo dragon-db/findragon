@@ -19,11 +19,14 @@ android {
         minSdk = Versions.MIN_SDK
         targetSdk = Versions.TARGET_SDK
 
-        versionCode = Versions.APP_CODE
-        versionName = Versions.APP_NAME
+        versionCode = FindragonVersions.APP_CODE
+        versionName = FindragonVersions.APP_NAME
 
         testInstrumentationRunner = "dev.jdtech.jellyfin.HiltTestRunner"
     }
+
+    // Findragon ships English only (all users are English); upstream translations stay untouched.
+    androidResources { localeFilters += "en" }
 
     buildTypes {
         named("debug") { applicationIdSuffix = ".findragon" }

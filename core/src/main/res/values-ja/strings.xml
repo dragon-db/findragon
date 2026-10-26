@@ -16,7 +16,7 @@
     <string name="genres">ジャンル</string>
     <string name="director">監督</string>
     <string name="writers">脚本家</string>
-    <string name="cast_amp_crew">キャスト＆クルー</string>
+    <string name="cast_amp_crew"><![CDATA[キャスト＆クルー]]></string>
     <string name="seasons">シーズン</string>
     <string name="play_button_description">メディアを再生</string>
     <string name="trailer_button_description">予告編を視聴</string>
@@ -91,7 +91,7 @@
     <string name="cancel_download">ダウンロードをキャンセル</string>
     <string name="cancel_download_message">ダウンロードを本当にキャンセルしますか？</string>
     <string name="stop_download">ダウンロードを停止</string>
-    <string name="privacy_policy_notice">Findragon を使用することで、<a href="https://raw.githubusercontent.com/jarnedemeulemeester/findroid/main/PRIVACY">プライバシーポリシー</a> に同意したものとみなされます。当社は一切のデータを収集しないことを明記しています</string>
+    <string name="privacy_policy_notice">Findroid を使用することで、<a href="https://raw.githubusercontent.com/jarnedemeulemeester/findroid/main/PRIVACY">プライバシーポリシー</a> に同意したものとみなされます。当社は一切のデータを収集しないことを明記しています</string>
     <string name="live_tv">ライブテレビ</string>
     <string name="play">再生</string>
     <string name="watch_trailer">予告編を視聴</string>
@@ -108,4 +108,5 @@
     <string name="download_paused">一時停止中</string>
     <string name="download_downloading">ダウンロード中…</string>
     <string name="download_failed">ダウンロードに失敗しました</string>
+    <string name="discard">破棄</string>
 </resources>

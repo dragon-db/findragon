@@ -1,6 +1,6 @@
 package dev.jdtech.jellyfin.jellyseerr.api
 
-import dev.jdtech.jellyfin.data.BuildConfig
+import dev.jdtech.jellyfin.findragon.FindragonConfig
 import dev.jdtech.jellyfin.jellyseerr.api.dto.CreateTvRequestDto
 import dev.jdtech.jellyfin.jellyseerr.api.dto.CreateIssueRequestDto
 import dev.jdtech.jellyfin.jellyseerr.api.dto.CreateRequestDto
@@ -269,7 +269,7 @@ class JellyseerrApiService(
     }
 
     private fun url(path: String, queryParameters: Map<String, String> = emptyMap()): HttpUrl {
-        return "${BuildConfig.JELLYSEERR_BASE_URL.trimEnd('/')}/api/v1/$path"
+        return "${FindragonConfig.seerrBaseUrl.trimEnd('/')}/api/v1/$path"
             .toHttpUrl()
             .newBuilder()
             .apply {

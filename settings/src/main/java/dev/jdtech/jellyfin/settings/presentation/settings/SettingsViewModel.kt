@@ -7,12 +7,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.jdtech.jellyfin.settings.R
-import dev.jdtech.jellyfin.settings.domain.AccountDetailsRepository
-import dev.jdtech.jellyfin.settings.domain.AccountDetailsResult
 import dev.jdtech.jellyfin.settings.domain.AppPreferences
 import dev.jdtech.jellyfin.settings.presentation.enums.DeviceType
 import dev.jdtech.jellyfin.settings.presentation.models.PreferenceAppLanguage
 import dev.jdtech.jellyfin.settings.presentation.models.PreferenceCategory
+import dev.jdtech.jellyfin.settings.presentation.models.PreferenceFileEdit
 import dev.jdtech.jellyfin.settings.presentation.models.PreferenceGroup
 import dev.jdtech.jellyfin.settings.presentation.models.PreferenceIntInput
 import dev.jdtech.jellyfin.settings.presentation.models.PreferenceLongInput
@@ -27,12 +26,8 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 
 @HiltViewModel
-class SettingsViewModel
-@Inject
-constructor(
-    private val appPreferences: AppPreferences,
-    private val accountDetailsRepository: AccountDetailsRepository,
-) : ViewModel() {
+class SettingsViewModel @Inject constructor(private val appPreferences: AppPreferences) :
+    ViewModel() {
     private val _state = MutableStateFlow(SettingsState())
     val state = _state.asStateFlow()
 
@@ -248,41 +243,85 @@ constructor(
                                             )
                                     ),
                                     PreferenceGroup(
-                                        nameStringResource = R.string.mpv_player,
                                         preferences =
                                             listOf(
-                                                PreferenceSwitch(
-                                                    nameStringResource = R.string.mpv_player,
-                                                    descriptionStringRes =
-                                                        R.string.mpv_player_summary,
-                                                    backendPreference = appPreferences.playerMpv,
-                                                ),
                                                 PreferenceSelect(
-                                                    nameStringResource =
-                                                        R.string.pref_player_mpv_hwdec,
-                                                    dependencies = listOf(appPreferences.playerMpv),
-                                                    backendPreference =
-                                                        appPreferences.playerMpvHwdec,
-                                                    options = R.array.mpv_hwdec,
-                                                    optionValues = R.array.mpv_hwdec,
+                                                    nameStringResource = R.string.pref_player_backend,
+                                                    backendPreference = appPreferences.playerBackend,
+                                                    options = R.array.player_backends,
+                                                    optionValues = R.array.player_backends
                                                 ),
-                                                PreferenceSelect(
-                                                    nameStringResource =
-                                                        R.string.pref_player_mpv_vo,
-                                                    dependencies = listOf(appPreferences.playerMpv),
-                                                    backendPreference = appPreferences.playerMpvVo,
-                                                    options = R.array.mpv_vos,
-                                                    optionValues = R.array.mpv_vos,
+                                                PreferenceCategory(
+                                                    nameStringResource = R.string.mpv_options,
+                                                    onClick = {
+                                                        viewModelScope.launch {
+                                                            eventsChannel.send(
+                                                                SettingsEvent.NavigateToSettings(
+                                                                    intArrayOf(R.string.settings_category_player, it.nameStringResource)
+                                                                )
+                                                            )
+                                                        }
+                                                    },
+                                                    nestedPreferenceGroups =
+                                                        listOf(
+                                                            PreferenceGroup(
+                                                                preferences =
+                                                                    listOf(
+                                                                        PreferenceSelect(
+                                                                            nameStringResource =
+                                                                                R.string.pref_player_mpv_hwdec,
+                                                                            backendPreference =
+                                                                                appPreferences.playerMpvHwdec,
+                                                                            options = R.array.mpv_hwdec,
+                                                                            optionValues = R.array.mpv_hwdec,
+                                                                        ),
+                                                                        PreferenceSelect(
+                                                                            nameStringResource =
+                                                                                R.string.pref_player_mpv_vo,
+                                                                            backendPreference = appPreferences.playerMpvVo,
+                                                                            options = R.array.mpv_vos,
+                                                                            optionValues = R.array.mpv_vos,
+                                                                        ),
+                                                                        PreferenceSelect(
+                                                                            nameStringResource =
+                                                                                R.string.pref_player_mpv_ao,
+                                                                            backendPreference = appPreferences.playerMpvAo,
+                                                                            options = R.array.mpv_aos,
+                                                                            optionValues = R.array.mpv_aos,
+                                                                        ),
+                                                                    ),
+                                                            ),
+                                                            PreferenceGroup(
+                                                                nameStringResource = R.string.advanced,
+                                                                preferences =
+                                                                    listOf(
+                                                                        PreferenceFileEdit(
+                                                                            nameStringResource = R.string.edit_file_title,
+                                                                            filePath = "mpv/mpv.conf",
+                                                                            onClick = {
+                                                                                viewModelScope.launch {
+                                                                                    eventsChannel.send(
+                                                                                        SettingsEvent.NavigateToSettingsFileEdit(it.filePath)
+                                                                                    )
+                                                                                }
+                                                                            }
+                                                                        ),
+                                                                        PreferenceFileEdit(
+                                                                            nameStringResource = R.string.edit_file_title,
+                                                                            filePath = "mpv/input.conf",
+                                                                            onClick = {
+                                                                                viewModelScope.launch {
+                                                                                    eventsChannel.send(
+                                                                                        SettingsEvent.NavigateToSettingsFileEdit(it.filePath)
+                                                                                    )
+                                                                                }
+                                                                            }
+                                                                        )
+                                                                    )
+                                                            ),
+                                                        )
                                                 ),
-                                                PreferenceSelect(
-                                                    nameStringResource =
-                                                        R.string.pref_player_mpv_ao,
-                                                    dependencies = listOf(appPreferences.playerMpv),
-                                                    backendPreference = appPreferences.playerMpvAo,
-                                                    options = R.array.mpv_aos,
-                                                    optionValues = R.array.mpv_aos,
-                                                ),
-                                            ),
+                                            )
                                     ),
                                     PreferenceGroup(
                                         nameStringResource = R.string.gestures,
@@ -717,11 +756,7 @@ constructor(
             ),
         )
 
-    fun loadPreferences(
-        indexes: IntArray = intArrayOf(),
-        deviceType: DeviceType,
-        loadAccountDetails: Boolean = false,
-    ) {
+    fun loadPreferences(indexes: IntArray = intArrayOf(), deviceType: DeviceType) {
         viewModelScope.launch {
             var preferences = topLevelPreferences
 
@@ -823,43 +858,7 @@ constructor(
                     }
                     .filter { it.preferences.isNotEmpty() }
 
-            val shouldLoadAccountDetails =
-                deviceType == DeviceType.PHONE && loadAccountDetails
-            _state.emit(
-                _state.value.copy(
-                    preferenceGroups = preferences,
-                    accountDetails = if (shouldLoadAccountDetails) _state.value.accountDetails else null,
-                    isAccountDetailsLoading = shouldLoadAccountDetails,
-                    accountDetailsError = null,
-                )
-            )
-
-            if (shouldLoadAccountDetails) {
-                loadAccountDetails()
-            }
-        }
-    }
-
-    private fun loadAccountDetails() {
-        viewModelScope.launch {
-            when (val result = accountDetailsRepository.getAccountDetails()) {
-                is AccountDetailsResult.Success ->
-                    _state.emit(
-                        _state.value.copy(
-                            accountDetails = result.details,
-                            isAccountDetailsLoading = false,
-                            accountDetailsError = null,
-                        )
-                    )
-                is AccountDetailsResult.Failure ->
-                    _state.emit(
-                        _state.value.copy(
-                            accountDetails = null,
-                            isAccountDetailsLoading = false,
-                            accountDetailsError = result.message,
-                        )
-                    )
-            }
+            _state.emit(_state.value.copy(preferenceGroups = preferences))
         }
     }
 

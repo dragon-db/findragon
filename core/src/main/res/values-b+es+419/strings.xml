@@ -13,7 +13,7 @@
     <string name="genres">Géneros</string>
     <string name="director">Director</string>
     <string name="writers">Escritores</string>
-    <string name="cast_amp_crew">Reparto y equipo</string>
+    <string name="cast_amp_crew"><![CDATA[Reparto y equipo]]></string>
     <string name="seasons">Temporadas</string>
     <string name="play_button_description">Reproducir contenido</string>
     <string name="trailer_button_description">Ver el adelanto</string>
@@ -82,7 +82,7 @@
     <string name="cancel_download_message">¿Quiere cancelar la descarga\?</string>
     <string name="stop_download">Detener descarga</string>
     <string name="size">Tamaño</string>
-    <string name="privacy_policy_notice">Al usar Findragon, aceptas la <a href="https://raw.githubusercontent.com/jarnedemeulemeester/findroid/main/PRIVACY">política de privacidad</a>, la cual establece que no recopilamos ningún dato</string>
+    <string name="privacy_policy_notice">Al usar Findroid, aceptas la <a href="https://raw.githubusercontent.com/jarnedemeulemeester/findroid/main/PRIVACY">política de privacidad</a>, la cual establece que no recopilamos ningún dato</string>
     <string name="live_tv">TV en vivo</string>
     <string name="play">Reproducir</string>
     <string name="watch_trailer">Ver trailer</string>
