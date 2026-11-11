@@ -3,9 +3,6 @@ package dev.jdtech.jellyfin.setup.presentation.login
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
-import dev.jdtech.jellyfin.core.R as CoreR
-import dev.jdtech.jellyfin.models.UiText
-import dev.jdtech.jellyfin.setup.R as SetupR
 import dev.jdtech.jellyfin.setup.domain.SetupRepository
 import javax.inject.Inject
 import kotlinx.coroutines.Job
@@ -61,12 +58,7 @@ class LoginViewModel @Inject constructor(private val repository: SetupRepository
                 _state.emit(_state.value.copy(isLoading = false))
                 eventsChannel.send(LoginEvent.Success)
             } catch (e: Exception) {
-                val message =
-                    if (e.message?.contains("401") == true) {
-                        UiText.StringResource(SetupR.string.login_error_wrong_username_password)
-                    } else {
-                        UiText.StringResource(CoreR.string.unknown_error)
-                    }
+                val message = loginErrorText(e)
                 _state.emit(_state.value.copy(isLoading = false, error = message))
             }
         }

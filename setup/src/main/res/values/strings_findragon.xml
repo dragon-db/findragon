@@ -2,4 +2,15 @@
 <!-- Findragon-only strings. Kept out of upstream's strings.xml so upstream merges never conflict. -->
 <resources>
     <string name="welcome_btn_add_server_manually">Add server manually</string>
+
+    <!-- Sign-in errors (presentation/login/LoginErrorText.kt) -->
+    <string name="login_error_account_blocked">This account can\'t sign in right now. It may be disabled. Please contact the admin.</string>
+    <string name="login_error_server_unreachable">Can\'t reach the server. Check your internet connection and try again.</string>
+    <string name="login_error_server_error">The server couldn\'t sign you in right now. Please try again in a moment.</string>
+
+    <!-- Dead saved login (presentation/session/SessionGateViewModel.kt) -->
+    <string name="session_sign_in_title">Please sign in again</string>
+    <string name="session_sign_in_session_ended">Your session ended. Please sign in again to continue.</string>
+    <string name="session_sign_in_password_changed">Your password was changed. Please sign in with your new password.</string>
+    <string name="session_sign_in_account_blocked">Your account can\'t sign in right now. It may be disabled. Please contact the admin.</string>
 </resources>

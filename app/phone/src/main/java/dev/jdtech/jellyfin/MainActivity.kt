@@ -11,6 +11,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.rememberNavController
 import dagger.hilt.android.AndroidEntryPoint
 import dev.jdtech.jellyfin.presentation.dragonhub.DragonHubOverlays
+import dev.jdtech.jellyfin.presentation.setup.session.SessionGate
 import dev.jdtech.jellyfin.presentation.theme.FindroidTheme
 import dev.jdtech.jellyfin.presentation.utils.LocalOfflineMode
 import dev.jdtech.jellyfin.viewmodels.MainViewModel
@@ -31,12 +32,14 @@ class MainActivity : AppCompatActivity() {
                 val navController = rememberNavController()
                 if (!state.isLoading) {
                     CompositionLocalProvider(LocalOfflineMode provides state.isOfflineMode) {
-                        NavigationRoot(
-                            navController = navController,
-                            hasServers = state.hasServers,
-                            hasCurrentServer = state.hasCurrentServer,
-                            hasCurrentUser = state.hasCurrentUser,
-                        )
+                        SessionGate(navController = navController) {
+                            NavigationRoot(
+                                navController = navController,
+                                hasServers = state.hasServers,
+                                hasCurrentServer = state.hasCurrentServer,
+                                hasCurrentUser = state.hasCurrentUser,
+                            )
+                        }
                     }
                 }
                 DragonHubOverlays(isAppReady = !state.isLoading)
