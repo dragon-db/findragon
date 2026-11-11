@@ -9,6 +9,7 @@ import android.view.SurfaceHolder
 import android.view.SurfaceView
 import android.view.TextureView
 import androidx.core.content.getSystemService
+import androidx.media3.common.AdPlaybackState
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.BasePlayer
 import androidx.media3.common.C
@@ -34,15 +35,15 @@ import androidx.media3.common.util.ListenerSet
 import androidx.media3.common.util.Size
 import androidx.media3.common.util.Util
 import dev.jdtech.mpv.MPVLib
-import dev.jdtech.mpv.MPVLib.MpvFormat
 import dev.jdtech.mpv.MPVLib.MpvEvent
+import dev.jdtech.mpv.MPVLib.MpvFormat
 import java.io.File
+import java.io.IOException
 import java.util.concurrent.CopyOnWriteArraySet
 import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
 import timber.log.Timber
-import java.io.IOException
 
 class MPVPlayer(
     context: Context,
@@ -144,13 +145,16 @@ class MPVPlayer(
 
         setupDirectories(context, configDir, cacheDir)
 
-        mpvLib = MPVLib.create(context) ?: throw IllegalStateException("MPVLib.create() returned null")
+        mpvLib =
+            MPVLib.create(context) ?: throw IllegalStateException("MPVLib.create() returned null")
 
         // General
         mpvLib.setOptionString("config", "yes")
         mpvLib.setOptionString("config-dir", configDir.path)
-        for (opt in arrayOf("gpu-shader-cache-dir", "icc-cache-dir"))
-            mpvLib.setOptionString(opt, cacheDir.path)
+        for (opt in arrayOf("gpu-shader-cache-dir", "icc-cache-dir")) mpvLib.setOptionString(
+            opt,
+            cacheDir.path,
+        )
         mpvLib.setOptionString("profile", "fast")
         mpvLib.setOptionString("vo", videoOutput)
         mpvLib.setOptionString("ao", audioOutput)
@@ -249,7 +253,8 @@ class MPVPlayer(
         val cacheDir = File(context.cacheDir, "fontconfig")
         if (!cacheDir.exists()) cacheDir.mkdirs()
 
-        val config = """
+        val config =
+            """
             <fontconfig>
                 <dir>/system/fonts/</dir>
                 <dir>/product/fonts/</dir>
@@ -275,7 +280,8 @@ class MPVPlayer(
                 </alias>
 
             </fontconfig>
-        """.trimIndent()
+        """
+                .trimIndent()
 
         try {
             configFile.writeText(config)
@@ -578,11 +584,13 @@ class MPVPlayer(
              */
             override fun getPeriod(periodIndex: Int, period: Period, setIds: Boolean): Period {
                 return period.set(
-                    /* id = */ periodIndex,
-                    /* uid = */ periodIndex,
-                    /* windowIndex = */ periodIndex,
-                    /* durationUs = */ Util.msToUs(currentDurationMs ?: C.TIME_UNSET),
-                    /* positionInWindowUs = */ 0,
+                    periodIndex,
+                    periodIndex,
+                    periodIndex,
+                    Util.msToUs(currentDurationMs ?: C.TIME_UNSET),
+                    0,
+                    AdPlaybackState.NONE,
+                    false,
                 )
             }
 
@@ -997,11 +1005,12 @@ class MPVPlayer(
         isRepeatingCurrentItem: Boolean,
     ) {
         if (mediaItemIndex == currentMediaItemIndex) {
-            val seekTo =
-                if (positionMs != C.TIME_UNSET) positionMs else initialSeekTo
+            val seekTo = if (positionMs != C.TIME_UNSET) positionMs else initialSeekTo
             initialSeekTo =
                 if (isPlayerReady) {
-                    mpvLib.command(arrayOf("seek", "${seekTo.toDouble().div(C.MILLIS_PER_SECOND)}", "absolute"))
+                    mpvLib.command(
+                        arrayOf("seek", "${seekTo.toDouble().div(C.MILLIS_PER_SECOND)}", "absolute")
+                    )
                     0L
                 } else {
                     seekTo
@@ -1367,7 +1376,8 @@ class MPVPlayer(
     }
 
     override fun getSurfaceSize(): Size {
-        val mpvSize = mpvLib.getPropertyString("android-surface-size")?.split("x") ?: return Size.UNKNOWN
+        val mpvSize =
+            mpvLib.getPropertyString("android-surface-size")?.split("x") ?: return Size.UNKNOWN
         return try {
             Size(mpvSize[0].toInt(), mpvSize[1].toInt())
         } catch (_: IndexOutOfBoundsException) {

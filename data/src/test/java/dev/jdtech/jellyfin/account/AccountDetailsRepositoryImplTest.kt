@@ -44,7 +44,7 @@ class AccountDetailsRepositoryImplTest {
             )
 
         sharedPreferences.edit().putString("pref_current_server", "server-id").apply()
-        every { serverDatabase.getServerWithAddressAndUser("server-id") } returns serverWithUser()
+        coEvery { serverDatabase.getServerWithAddressAndUser("server-id") } returns serverWithUser()
         every { secureCredentialsStore.getUserPassword("server-id", "dragon") } returns "password"
     }
 

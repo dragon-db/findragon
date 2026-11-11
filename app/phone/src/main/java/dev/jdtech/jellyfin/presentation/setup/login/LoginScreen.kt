@@ -65,10 +65,8 @@ fun LoginScreen(
     onBackClick: () -> Unit,
     prefilledUsername: String? = null,
     viewModel: LoginViewModel = hiltViewModel(),
-    phoneLoginCredentialsViewModel: PhoneLoginCredentialsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    var submittedPassword by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(true) {
         viewModel.loadServer()
@@ -78,13 +76,7 @@ fun LoginScreen(
 
     ObserveAsEvents(viewModel.events) { event ->
         when (event) {
-            is LoginEvent.Success -> {
-                submittedPassword?.let { password ->
-                    phoneLoginCredentialsViewModel.savePasswordForCurrentUser(password)
-                } ?: phoneLoginCredentialsViewModel.clearPasswordForCurrentUser()
-                submittedPassword = null
-                onSuccess()
-            }
+            is LoginEvent.Success -> onSuccess()
         }
     }
 
@@ -92,10 +84,9 @@ fun LoginScreen(
         state = state,
         onAction = { action ->
             when (action) {
-                is LoginAction.OnLoginClick -> submittedPassword = action.password
-                is LoginAction.OnQuickConnectClick -> submittedPassword = null
                 is LoginAction.OnChangeServerClick -> onChangeServerClick()
                 is LoginAction.OnBackClick -> onBackClick()
+                else -> Unit
             }
             viewModel.onAction(action)
         },

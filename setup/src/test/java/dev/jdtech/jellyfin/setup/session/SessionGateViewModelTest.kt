@@ -57,6 +57,38 @@ class SessionGateViewModelTest {
     }
 
     @Test
+    fun `valid login is not signed out`() = runTest(dispatcher) {
+        val access = FakeSessionAccess()
+        val viewModel = viewModel(access)
+
+        viewModel.start()
+        advanceUntilIdle()
+
+        assertEquals(0, access.signOutCalls)
+    }
+
+    @Test
+    fun `dead login is signed out after the hub saw it`() = runTest(dispatcher) {
+        val access =
+            FakeSessionAccess(
+                verifyError = InvalidStatusException(401),
+                loginError = InvalidStatusException(403),
+            )
+        var userAtHubCall: User? = null
+        accountSource.onFetch = { userAtHubCall = access.user }
+        accountSource.result = known(AccountBlock.DISABLED_BY_ADMIN)
+        val viewModel = viewModel(access)
+
+        viewModel.start()
+        advanceUntilIdle()
+
+        assertEquals(testUser, userAtHubCall)
+        assertEquals(1, access.signOutCalls)
+        assertNull(access.user)
+        assertEquals("dragon", viewModel.state.value.pendingSignIn)
+    }
+
+    @Test
     fun `dead login without password opens sign-in with the username`() = runTest(dispatcher) {
         val viewModel =
             viewModel(FakeSessionAccess(verifyError = InvalidStatusException(401), password = null))
@@ -142,6 +174,9 @@ class SessionGateViewModelTest {
         assertEquals(1, access.verifyCalls)
 
         // Back on home after the redirect (signed in, or picked the saved user again): check.
+        // The dead login was signed out; either way the user is the current user again.
+        assertEquals(1, access.signOutCalls)
+        access.user = testUser
         viewModel.onSignInOpened()
         viewModel.onHomeShown()
         advanceUntilIdle()
@@ -402,8 +437,11 @@ class SessionGateViewModelTest {
         var fetchCalls = 0
             private set
 
+        var onFetch: () -> Unit = {}
+
         override suspend fun fetch(): AccountStatusResult {
             fetchCalls++
+            onFetch()
             return result
         }
     }

@@ -97,7 +97,7 @@ class DragonHubAccountTest {
 
     @Test
     fun `sends the saved Jellyfin token of the current user`() = runTest {
-        every { database.getServerWithAddressAndUser("server-id") } returns serverWithUser("token-1")
+        coEvery { database.getServerWithAddressAndUser("server-id") } returns serverWithUser("token-1")
         coEvery { apiService.getAccount("token-1") } returns
             DragonHubAccountResponse.Success(dto(disabledReason = "expired"))
 
@@ -109,7 +109,7 @@ class DragonHubAccountTest {
 
     @Test
     fun `unknown token is reported separately`() = runTest {
-        every { database.getServerWithAddressAndUser("server-id") } returns serverWithUser("token-1")
+        coEvery { database.getServerWithAddressAndUser("server-id") } returns serverWithUser("token-1")
         coEvery { apiService.getAccount("token-1") } returns
             DragonHubAccountResponse.Error(401, "token_unknown")
 
@@ -118,7 +118,7 @@ class DragonHubAccountTest {
 
     @Test
     fun `hub errors and outages are unavailable`() = runTest {
-        every { database.getServerWithAddressAndUser("server-id") } returns serverWithUser("token-1")
+        coEvery { database.getServerWithAddressAndUser("server-id") } returns serverWithUser("token-1")
         coEvery { apiService.getAccount("token-1") } returns
             DragonHubAccountResponse.Error(502, "jellyfin_unreachable")
         assertTrue(source().fetch() is AccountStatusResult.Unavailable)
@@ -131,7 +131,7 @@ class DragonHubAccountTest {
     fun `disabled hub or missing login never calls the hub`() = runTest {
         assertTrue(source(isEnabled = false).fetch() is AccountStatusResult.Unavailable)
 
-        every { database.getServerWithAddressAndUser("server-id") } returns serverWithUser(null)
+        coEvery { database.getServerWithAddressAndUser("server-id") } returns serverWithUser(null)
         assertTrue(source().fetch() is AccountStatusResult.Unavailable)
 
         coVerify(exactly = 0) { apiService.getAccount(any()) }
