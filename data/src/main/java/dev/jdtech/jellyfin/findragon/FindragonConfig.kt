@@ -25,9 +25,9 @@ object FindragonConfig {
     val isSeerrEnabled: Boolean
         get() = seerrBaseUrl.isNotBlank()
 
-    /** Account card in Settings (JFA-GO). */
+    /** Account card in Settings (DragonHub account API). */
     val isAccountDetailsEnabled: Boolean
-        get() = jfaGoBaseUrl.isNotBlank()
+        get() = dragonHubUrl.isNotBlank()
 
     /** Update prompt and notifications on app start (Dragon Hub). */
     val isDragonHubEnabled: Boolean

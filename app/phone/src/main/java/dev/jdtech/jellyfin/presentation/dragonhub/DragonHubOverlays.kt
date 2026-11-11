@@ -52,7 +52,7 @@ fun DragonHubOverlays(isAppReady: Boolean, viewModel: DragonHubViewModel = hiltV
     }
 }
 
-private fun Context.openHttpUrl(url: String): Boolean {
+internal fun Context.openHttpUrl(url: String): Boolean {
     val uri = runCatching { Uri.parse(url) }.getOrNull() ?: return false
     if (uri.scheme !in setOf("http", "https")) return false
 

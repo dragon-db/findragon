@@ -4,12 +4,10 @@ import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
-import dev.jdtech.jellyfin.account.AccountDetailsRepositoryImpl
 import dev.jdtech.jellyfin.account.api.JfaGoApiService
-import dev.jdtech.jellyfin.auth.SecureCredentialsStore
-import dev.jdtech.jellyfin.database.ServerDatabaseDao
+import dev.jdtech.jellyfin.dragonhub.account.AccountStatusSource
+import dev.jdtech.jellyfin.dragonhub.account.DragonHubAccountDetailsRepository
 import dev.jdtech.jellyfin.settings.domain.AccountDetailsRepository
-import dev.jdtech.jellyfin.settings.domain.AppPreferences
 import javax.inject.Singleton
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
@@ -17,6 +15,7 @@ import okhttp3.OkHttpClient
 @Module
 @InstallIn(SingletonComponent::class)
 object AccountDetailsModule {
+    /** Unused since the account card moved to DragonHub; goes away with the rest of JFA-GO. */
     @Singleton
     @Provides
     fun provideJfaGoApiService(
@@ -29,16 +28,8 @@ object AccountDetailsModule {
     @Singleton
     @Provides
     fun provideAccountDetailsRepository(
-        apiService: JfaGoApiService,
-        serverDatabase: ServerDatabaseDao,
-        appPreferences: AppPreferences,
-        secureCredentialsStore: SecureCredentialsStore,
+        accountStatusSource: AccountStatusSource
     ): AccountDetailsRepository {
-        return AccountDetailsRepositoryImpl(
-            apiService = apiService,
-            serverDatabase = serverDatabase,
-            appPreferences = appPreferences,
-            secureCredentialsStore = secureCredentialsStore,
-        )
+        return DragonHubAccountDetailsRepository(accountStatusSource)
     }
 }
