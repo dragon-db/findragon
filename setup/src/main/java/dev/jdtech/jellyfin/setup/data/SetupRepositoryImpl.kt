@@ -13,6 +13,7 @@ import dev.jdtech.jellyfin.models.UiText
 import dev.jdtech.jellyfin.models.User
 import dev.jdtech.jellyfin.settings.domain.AppPreferences
 import dev.jdtech.jellyfin.setup.R as SetupR
+import dev.jdtech.jellyfin.setup.domain.LoginPasswordSaver
 import dev.jdtech.jellyfin.setup.domain.SetupRepository
 import java.util.UUID
 import kotlinx.coroutines.Dispatchers
@@ -92,6 +93,7 @@ class SetupRepositoryImpl(
     private val database: ServerDatabaseDao,
     private val appPreferences: AppPreferences,
     private val secureCredentialsStore: SecureCredentialsStore,
+    private val loginPasswordSaver: LoginPasswordSaver? = null,
 ) : SetupRepository {
     override fun discoverServers(): Flow<ServerDiscoveryInfo> {
         return jellyfinApi.jellyfin.discovery.discoverLocalServers()
@@ -262,6 +264,7 @@ class SetupRepositoryImpl(
                     data = AuthenticateUserByName(username = username, pw = password)
                 )
 
+            saveLoginPassword(authenticationResult, password)
             saveAuthenticationResult(authenticationResult)
         }
     }
@@ -273,8 +276,17 @@ class SetupRepositoryImpl(
                     data = QuickConnectDto(secret = secret)
                 )
 
+            saveLoginPassword(authenticationResult, password = null)
             saveAuthenticationResult(authenticationResult)
         }
+    }
+
+    // Runs before saveAuthenticationResult: saving the login switches the app to Home and removes the
+    // login screen, so the password must be stored first.
+    private fun saveLoginPassword(authenticationResult: AuthenticationResult, password: String?) {
+        val serverId = authenticationResult.serverId ?: return
+        val username = authenticationResult.user?.name ?: return
+        loginPasswordSaver?.onSignedIn(serverId, username, password)
     }
 
     private suspend fun saveAuthenticationResult(authenticationResult: AuthenticationResult) {

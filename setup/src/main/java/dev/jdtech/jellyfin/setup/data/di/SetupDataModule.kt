@@ -9,10 +9,13 @@ import dev.jdtech.jellyfin.auth.SecureCredentialsStore
 import dev.jdtech.jellyfin.database.ServerDatabaseDao
 import dev.jdtech.jellyfin.settings.domain.AppPreferences
 import dev.jdtech.jellyfin.setup.data.SetupRepositoryImpl
+import dev.jdtech.jellyfin.setup.domain.LoginPasswordSaver
 import dev.jdtech.jellyfin.setup.domain.SetupRepository
 import dev.jdtech.jellyfin.setup.presentation.welcome.BuildConfigDefaultServerConfig
 import dev.jdtech.jellyfin.setup.presentation.welcome.DefaultServerConfig
+import java.util.Optional
 import javax.inject.Singleton
+import kotlin.jvm.optionals.getOrNull
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -30,12 +33,14 @@ object SetupDataModule {
         serverDatabase: ServerDatabaseDao,
         appPreferences: AppPreferences,
         secureCredentialsStore: SecureCredentialsStore,
+        loginPasswordSaver: Optional<LoginPasswordSaver>,
     ): SetupRepository {
         return SetupRepositoryImpl(
             jellyfinApi = jellyfinApi,
             database = serverDatabase,
             appPreferences = appPreferences,
             secureCredentialsStore = secureCredentialsStore,
+            loginPasswordSaver = loginPasswordSaver.getOrNull(),
         )
     }
 }
