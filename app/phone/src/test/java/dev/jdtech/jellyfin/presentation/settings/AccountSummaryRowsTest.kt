@@ -17,7 +17,7 @@ class AccountSummaryRowsTest {
         assertFalse(
             shouldShowAccountDetails(
                 isConfigured = false,
-                indexes = intArrayOf(CoreR.string.title_settings),
+                indexes = listOf(CoreR.string.title_settings),
             )
         )
     }
@@ -27,13 +27,13 @@ class AccountSummaryRowsTest {
         assertTrue(
             shouldShowAccountDetails(
                 isConfigured = true,
-                indexes = intArrayOf(CoreR.string.title_settings),
+                indexes = listOf(CoreR.string.title_settings),
             )
         )
         assertFalse(
             shouldShowAccountDetails(
                 isConfigured = true,
-                indexes = intArrayOf(CoreR.string.title_settings, SettingsR.string.account),
+                indexes = listOf(CoreR.string.title_settings, SettingsR.string.account),
             )
         )
     }

@@ -21,6 +21,12 @@ interface SessionAccess {
 
     /** A normal username/password sign-in that saves the new login (upstream `SetupRepository`). */
     suspend fun login(username: String, password: String)
+
+    /**
+     * Keeps the user saved but leaves the server without a signed-in user, so the app shows the
+     * user list (upstream's setup flow) instead of screens that fail.
+     */
+    suspend fun signOutCurrentUser()
 }
 
 sealed interface SessionCheckResult {
@@ -59,6 +65,9 @@ enum class SignInReason {
  */
 class SessionRecovery(private val access: SessionAccess) {
     suspend fun currentUserId(): UUID? = access.currentUser()?.id
+
+    /** Call after [check] returned [SessionCheckResult.SignInRequired] and its details are read. */
+    suspend fun signOut() = access.signOutCurrentUser()
 
     suspend fun check(): SessionCheckResult {
         if (access.isOfflineMode()) return SessionCheckResult.Skipped
