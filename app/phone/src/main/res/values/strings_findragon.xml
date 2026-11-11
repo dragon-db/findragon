@@ -89,4 +89,11 @@
     <string name="dragon_hub_notifications_count_multiple">%1$d notifications</string>
     <string name="dragon_hub_notifications_close">Close</string>
     <string name="dragon_hub_notifications_dismiss">Dismiss</string>
+    <string name="account_notice_expired_title">Subscription expired</string>
+    <string name="account_notice_expired_on">Your subscription expired on %1$s. Please contact the admin to renew.</string>
+    <string name="account_notice_expired">Your subscription has expired. Please contact the admin to renew.</string>
+    <string name="account_notice_disabled_title">Account disabled</string>
+    <string name="account_notice_disabled_by_admin">Your account was disabled by the admin. Please contact the admin.</string>
+    <string name="account_notice_disabled_on_server">Your account is disabled on the media server. Please contact the admin.</string>
+    <string name="account_notice_ok">OK</string>
 </resources>

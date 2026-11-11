@@ -9,4 +9,13 @@
     <string name="account_no_expiry">No expiry</string>
     <string name="account_loading">Loading account details…</string>
     <string name="account_error">Account details error</string>
+    <string name="account_plan">Plan</string>
+    <string name="account_status">Status</string>
+    <string name="account_status_active">Active</string>
+    <string name="account_status_expired">Expired</string>
+    <string name="account_status_disabled">Disabled</string>
+    <plurals name="account_expiry_days_left">
+        <item quantity="one">%1$s (%2$d day left)</item>
+        <item quantity="other">%1$s (%2$d days left)</item>
+    </plurals>
 </resources>

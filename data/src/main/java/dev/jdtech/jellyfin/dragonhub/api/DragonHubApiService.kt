@@ -1,5 +1,7 @@
 package dev.jdtech.jellyfin.dragonhub.api
 
+import dev.jdtech.jellyfin.dragonhub.api.dto.DragonHubAccountDto
+import dev.jdtech.jellyfin.dragonhub.api.dto.DragonHubErrorDto
 import dev.jdtech.jellyfin.dragonhub.api.dto.DragonHubNotificationsResponseDto
 import dev.jdtech.jellyfin.dragonhub.api.dto.DragonHubVersionResponseDto
 import dev.jdtech.jellyfin.findragon.FindragonConfig
@@ -28,6 +30,37 @@ class DragonHubApiService(
             addQueryParameter("username", username)
         }
     }
+
+    /**
+     * Account status of whoever owns [jellyfinToken]. The hub still answers after Jellyfin revoked
+     * the token, so this also explains a dead login.
+     */
+    suspend fun getAccount(jellyfinToken: String): DragonHubAccountResponse =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                    val request =
+                        Request.Builder()
+                            .url(url("p/accountdb/app/account") {})
+                            .header(JELLYFIN_TOKEN_HEADER, jellyfinToken)
+                            .get()
+                            .build()
+
+                    okHttpClient.newCall(request).execute().use { response ->
+                        val body = response.body.string()
+                        if (response.isSuccessful) {
+                            DragonHubAccountResponse.Success(
+                                json.decodeFromString<DragonHubAccountDto>(body)
+                            )
+                        } else {
+                            val error =
+                                runCatching { json.decodeFromString<DragonHubErrorDto>(body) }
+                                    .getOrNull()
+                            DragonHubAccountResponse.Error(response.code, error?.code)
+                        }
+                    }
+                }
+                .getOrElse { DragonHubAccountResponse.Unreachable }
+        }
 
     private suspend inline fun <reified T> get(
         path: String,
@@ -67,4 +100,16 @@ class DragonHubApiService(
             .apply(configureUrl)
             .build()
     }
+}
+
+private const val JELLYFIN_TOKEN_HEADER = "X-Jellyfin-Token"
+
+sealed interface DragonHubAccountResponse {
+    data class Success(val account: DragonHubAccountDto) : DragonHubAccountResponse
+
+    /** [code] is the hub's error code (e.g. `token_unknown`), null if the body had none. */
+    data class Error(val httpStatus: Int, val code: String?) : DragonHubAccountResponse
+
+    /** Network failure, unreadable response, or the hub is not configured. */
+    data object Unreachable : DragonHubAccountResponse
 }

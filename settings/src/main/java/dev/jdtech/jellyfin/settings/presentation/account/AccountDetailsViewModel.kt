@@ -18,7 +18,7 @@ data class AccountDetailsState(
 )
 
 /**
- * Findragon account card (JFA-GO) on the phone Settings root page. Kept apart from
+ * Findragon account card (DragonHub) on the phone Settings root page. Kept apart from
  * SettingsViewModel.
  */
 @HiltViewModel
