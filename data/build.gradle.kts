@@ -1,8 +1,11 @@
 plugins {
     alias(libs.plugins.android.library)
+    alias(libs.plugins.androidx.room3)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
 }
+
+java { toolchain { languageVersion = Versions.JAVA } }
 
 android {
     namespace = "dev.jdtech.jellyfin.data"
@@ -19,11 +22,6 @@ android {
         }
 
         consumerProguardFile("proguard-rules.pro")
-
-        ksp {
-            arg("room.schemaLocation", "$projectDir/schemas")
-            arg("room.generateKotlin", "true")
-        }
     }
 
     buildTypes {
@@ -31,26 +29,24 @@ android {
         register("staging") { initWith(getByName("release")) }
     }
 
-    compileOptions {
-        sourceCompatibility = Versions.JAVA
-        targetCompatibility = Versions.JAVA
-    }
-
     buildFeatures { buildConfig = true }
 }
+
+room3 { schemaDirectory("$projectDir/schemas") }
 
 dependencies {
     implementation(projects.settings)
     implementation(libs.androidx.paging)
-    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room3.runtime)
     implementation(libs.androidx.security.crypto)
-    ksp(libs.androidx.room.compiler)
+    ksp(libs.androidx.room3.compiler)
     implementation(libs.jellyfin.core)
+    implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.okhttp)
     implementation(libs.timber)
 
     testImplementation("io.mockk:mockk:1.13.13")
     testImplementation("junit:junit:4.13.2")
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
+    testImplementation(libs.kotlinx.coroutines.test)
 }
