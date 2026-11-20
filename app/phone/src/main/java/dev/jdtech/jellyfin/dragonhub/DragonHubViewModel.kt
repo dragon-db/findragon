@@ -13,6 +13,8 @@ import java.time.LocalDateTime
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -40,14 +42,27 @@ constructor(
 
         viewModelScope.launch {
             try {
-                val update =
-                    apiService.getVersion()?.takeIf {
-                        DragonHubUpdatePolicy.isUpdateAvailable(it.versionCode)
+                // Both questions at once: neither answer depends on the other.
+                val (update, notifications) =
+                    coroutineScope {
+                        val update =
+                            async {
+                                apiService.getVersion()?.takeIf {
+                                    DragonHubUpdatePolicy.isUpdateAvailable(it.versionCode)
+                                }
+                            }
+                        val notifications =
+                            async {
+                                currentUsername()?.let { username ->
+                                    apiService
+                                        .getNotifications(username)
+                                        ?.notifications
+                                        .orEmpty()
+                                        .latestFirst()
+                                } ?: emptyList()
+                            }
+                        update.await() to notifications.await()
                     }
-                val notifications =
-                    currentUsername()?.let { username ->
-                        apiService.getNotifications(username)?.notifications.orEmpty().latestFirst()
-                    } ?: emptyList()
 
                 _state.update {
                     it.copy(

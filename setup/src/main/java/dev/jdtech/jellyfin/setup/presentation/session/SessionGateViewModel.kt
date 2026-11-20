@@ -143,12 +143,14 @@ constructor(
 
                 when (result) {
                     is SessionCheckResult.Valid -> {
+                        showApp()
                         onWorkingLogin(result.userId)
                     }
                     is SessionCheckResult.Recovered -> {
                         if (_state.value.isReady) {
                             _state.update { it.copy(reloadHome = true) }
                         }
+                        showApp()
                         onWorkingLogin(result.userId)
                     }
                     is SessionCheckResult.Unreachable -> checkedUserId = result.userId
@@ -159,6 +161,15 @@ constructor(
             }
         checkJob = job
         return job
+    }
+
+    /**
+     * The login works, so the app can show now. The DragonHub status only decides whether an
+     * "account expired" notice pops up, and that may follow a moment later. Before this, every
+     * start waited for the hub as well (on its own connection, so up to the full timeout).
+     */
+    private fun showApp() {
+        _state.update { it.copy(isReady = true) }
     }
 
     private suspend fun onWorkingLogin(userId: UUID) {
@@ -186,11 +197,13 @@ constructor(
 
         // The hub still knows whose dead login this is. A disabled account explains itself better
         // than the generic sign-in message.
+        // Capped, because the sign-in screen waits for this answer.
         val disabled =
             if (result.reason == SignInReason.PASSWORD_CHANGED) {
                 null
             } else {
-                fetchAccountStatus()?.takeIf { it.block != null && it.block != AccountBlock.EXPIRED }
+                withTimeoutOrNull(SIGN_IN_HUB_TIMEOUT_MS) { fetchAccountStatus() }
+                    ?.takeIf { it.block != null && it.block != AccountBlock.EXPIRED }
             }
 
         // After the hub call, which identifies the user by the dead login. Signing out makes the app
@@ -218,6 +231,7 @@ constructor(
 
     companion object {
         const val READY_TIMEOUT_MS = 3_000L
+        const val SIGN_IN_HUB_TIMEOUT_MS = 3_000L
         const val RECHECK_INTERVAL_MS = 10 * 60 * 1_000L
         const val RECHECK_INTERVAL_BLOCKED_MS = 60 * 1_000L
     }
