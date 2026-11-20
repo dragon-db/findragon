@@ -42,6 +42,8 @@ data class IssueReportTarget(
     val seasons: List<JellyseerrTvSeason> = emptyList(),
     val defaultSeasonNumber: Int? = null,
     val defaultEpisodeNumber: Int? = null,
+    /** From the Seerr details: open issues on this title, or null when unknown. */
+    val openIssueCount: Int? = null,
 ) {
     val isSeries: Boolean
         get() = mediaType == IssueReportMediaType.SERIES

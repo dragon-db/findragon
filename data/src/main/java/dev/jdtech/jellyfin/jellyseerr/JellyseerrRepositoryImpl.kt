@@ -15,6 +15,7 @@ import dev.jdtech.jellyfin.jellyseerr.model.JellyseerrMedia
 import dev.jdtech.jellyfin.jellyseerr.model.JellyseerrMediaStatus
 import dev.jdtech.jellyfin.jellyseerr.model.JellyseerrMediaType
 import dev.jdtech.jellyfin.jellyseerr.model.JellyseerrMovieDetails
+import dev.jdtech.jellyfin.jellyseerr.model.JellyseerrRatings
 import dev.jdtech.jellyfin.jellyseerr.model.JellyseerrRecentRequest
 import dev.jdtech.jellyfin.jellyseerr.model.JellyseerrRequestStatus
 import dev.jdtech.jellyfin.jellyseerr.model.JellyseerrTvDetails
@@ -31,12 +32,20 @@ import dev.jdtech.jellyfin.models.FindroidShow
 import dev.jdtech.jellyfin.repository.JellyfinRepository
 import dev.jdtech.jellyfin.settings.domain.AppPreferences
 import java.io.IOException
+import java.io.InterruptedIOException
+import java.net.UnknownHostException
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.supervisorScope
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.withPermit
+import kotlinx.coroutines.withContext
 import timber.log.Timber
 
 class JellyseerrRepositoryImpl(
@@ -46,8 +55,28 @@ class JellyseerrRepositoryImpl(
     private val secureCredentialsStore: SecureCredentialsStore,
     private val jellyfinRepository: JellyfinRepository,
 ) : JellyseerrRepository {
+    /** Only one Seerr sign-in at a time, so parallel requests with an expired cookie share it. */
+    private val authMutex = Mutex()
+
+    /**
+     * Title, poster and overview of titles seen in details or recent requests. Recent requests
+     * only carry ids and status, so without this every Explore load fetched full details for each
+     * request. Status always comes from the fresh request, never from here.
+     */
+    private val mediaMetadataCache =
+        JellyseerrLruCache<MediaKey, JellyseerrMedia>(MEDIA_METADATA_CACHE_SIZE)
+
+    /** Keeps recent-request lookups from taking every connection the shelves need. */
+    private val recentRequestLookups = Semaphore(RECENT_REQUEST_LOOKUP_CONCURRENCY)
+
     override suspend fun ensureAuthenticated() {
         runRequest { currentSessionCookie(currentContext()) }
+    }
+
+    override suspend fun currentAccountKey(): String? {
+        val serverId = appPreferences.getValue(appPreferences.currentServer) ?: return null
+        val username = serverDatabase.getServerWithAddressAndUser(serverId)?.user?.name ?: return null
+        return "$serverId::$username"
     }
 
     override suspend fun search(query: String): List<JellyseerrMedia> {
@@ -81,13 +110,13 @@ class JellyseerrRepositoryImpl(
                     retryJellyseerrRequest("recent requests") {
                         apiService.getRecentRequests(sessionCookie).results
                     }
+                val metadata =
+                    loadRecentRequestMetadata(
+                        sessionCookie = sessionCookie,
+                        keys = requests.mapNotNull { it.mediaKey() }.distinct(),
+                    )
 
-                supervisorScope {
-                    requests
-                        .map { request -> async { enrichRecentRequest(sessionCookie, request) } }
-                        .awaitAll()
-                        .filterNotNull()
-                }
+                requests.mapNotNull { request -> request.toRecentRequest(metadata) }
             }
         }
     }
@@ -115,36 +144,37 @@ class JellyseerrRepositoryImpl(
     override suspend fun getMovieDetails(tmdbId: Int): JellyseerrMovieDetails {
         return runRequest {
             withSession { sessionCookie ->
-                val details =
-                    retryJellyseerrRequest("movie details $tmdbId") {
-                        apiService.getMovieDetails(sessionCookie, tmdbId)
-                    }
-                val ratings =
-                    optionalRequest("movie ratings", tmdbId) {
-                        apiService.getMovieRatingsCombined(sessionCookie, tmdbId)
-                            .toJellyseerrRatings(details.voteAverage)
-                    }
-
-                details.toJellyseerrMovieDetails(ratings = ratings)
+                retryJellyseerrRequest("movie details $tmdbId") {
+                    apiService.getMovieDetails(sessionCookie, tmdbId)
+                }
+                    .toJellyseerrMovieDetails()
             }
         }
+            .also { rememberMetadata(it.toJellyseerrMedia()) }
     }
 
     override suspend fun getTvDetails(tmdbId: Int): JellyseerrTvDetails {
         return runRequest {
             withSession { sessionCookie ->
-                val details =
-                    retryJellyseerrRequest("tv details $tmdbId") {
-                        apiService.getTvDetails(sessionCookie, tmdbId)
-                    }
-                val ratings =
-                    optionalRequest("tv ratings", tmdbId) {
-                        apiService.getTvRatings(sessionCookie, tmdbId)
-                            .toJellyseerrRatings(details.voteAverage)
-                    }
-
-                details.toJellyseerrTvDetails(ratings = ratings)
+                retryJellyseerrRequest("tv details $tmdbId") {
+                    apiService.getTvDetails(sessionCookie, tmdbId)
+                }
+                    .toJellyseerrTvDetails()
             }
+        }
+            .also { rememberMetadata(it.toJellyseerrMedia()) }
+    }
+
+    override suspend fun getMovieRatings(tmdbId: Int, tmdbVoteAverage: Double?): JellyseerrRatings? {
+        return getRatings("movie ratings $tmdbId") { sessionCookie ->
+            apiService.getMovieRatingsCombined(sessionCookie, tmdbId)
+                .toJellyseerrRatings(tmdbVoteAverage)
+        }
+    }
+
+    override suspend fun getTvRatings(tmdbId: Int, tmdbVoteAverage: Double?): JellyseerrRatings? {
+        return getRatings("tv ratings $tmdbId") { sessionCookie ->
+            apiService.getTvRatings(sessionCookie, tmdbId).toJellyseerrRatings(tmdbVoteAverage)
         }
     }
 
@@ -318,46 +348,111 @@ class JellyseerrRepositoryImpl(
         }
     }
 
-    private suspend fun enrichRecentRequest(
+    /**
+     * Title info for each requested title: from the cache when seen before, otherwise one details
+     * lookup per title (a title requested twice is looked up once), a few at a time.
+     */
+    private suspend fun loadRecentRequestMetadata(
         sessionCookie: String,
-        request: MediaRequestDto,
-    ): JellyseerrRecentRequest? {
-        val mediaInfo = request.media ?: return null
-        val tmdbId = mediaInfo.tmdbId ?: return null
-        val mediaType =
-            mediaInfo.mediaType
-                ?.takeIf { it.isNotBlank() }
-                ?.let(JellyseerrMediaType::fromApiValue)
-                ?: JellyseerrMediaType.fromApiValue(request.type)
+        keys: List<MediaKey>,
+    ): Map<MediaKey, JellyseerrMedia> {
+        return supervisorScope {
+            keys
+                .map { key ->
+                    async {
+                        val media =
+                            mediaMetadataCache[key]
+                                ?: recentRequestLookups.withPermit {
+                                    fetchMetadata(sessionCookie, key)
+                                }
+                        media?.let { key to it }
+                    }
+                }
+                .awaitAll()
+                .filterNotNull()
+                .toMap()
+        }
+    }
+
+    private suspend fun fetchMetadata(sessionCookie: String, key: MediaKey): JellyseerrMedia? {
         val media =
-            when (mediaType) {
+            when (key.mediaType) {
                 JellyseerrMediaType.MOVIE ->
-                    optionalRequest("recent request movie details", tmdbId) {
-                        apiService.getMovieDetails(sessionCookie, tmdbId)
+                    optionalRequest("recent request movie details", key.tmdbId) {
+                        apiService.getMovieDetails(sessionCookie, key.tmdbId)
                             .toJellyseerrMovieDetails()
                             .toJellyseerrMedia()
                     }
                 JellyseerrMediaType.TV ->
-                    optionalRequest("recent request tv details", tmdbId) {
-                        apiService.getTvDetails(sessionCookie, tmdbId)
+                    optionalRequest("recent request tv details", key.tmdbId) {
+                        apiService.getTvDetails(sessionCookie, key.tmdbId)
                             .toJellyseerrTvDetails()
                             .toJellyseerrMedia()
                     }
-            } ?: return null
+            }
+        media?.let(::rememberMetadata)
+        return media
+    }
+
+    private fun rememberMetadata(media: JellyseerrMedia) {
+        mediaMetadataCache[MediaKey(media.mediaType, media.tmdbId)] = media
+    }
+
+    private fun MediaRequestDto.toRecentRequest(
+        metadata: Map<MediaKey, JellyseerrMedia>
+    ): JellyseerrRecentRequest? {
+        val mediaInfo = media ?: return null
+        val title = mediaKey()?.let(metadata::get) ?: return null
 
         return JellyseerrRecentRequest(
-            requestId = request.id,
-            media = media,
-            requestStatus = JellyseerrRequestStatus.fromCode(request.status),
-            requestedAt = request.createdAt,
-            updatedAt = request.updatedAt,
+            requestId = id,
+            // Title info may be cached; availability comes from this request's own media record.
+            media =
+                title.copy(
+                    status =
+                        mediaInfo.status?.let(JellyseerrMediaStatus::fromCode) ?: title.status,
+                    jellyfinMediaId = mediaInfo.jellyfinMediaId ?: title.jellyfinMediaId,
+                ),
+            requestStatus = JellyseerrRequestStatus.fromCode(status),
+            requestedAt = createdAt,
+            updatedAt = updatedAt,
             seasonNumbers =
-                request.seasons
+                seasons
                     .map { it.seasonNumber }
                     .filter { it > 0 }
                     .distinct()
                     .sorted(),
         )
+    }
+
+    private fun MediaRequestDto.mediaKey(): MediaKey? {
+        val mediaInfo = media ?: return null
+        val tmdbId = mediaInfo.tmdbId ?: return null
+        val mediaType =
+            mediaInfo.mediaType
+                ?.takeIf { it.isNotBlank() }
+                ?.let(JellyseerrMediaType::fromApiValue)
+                ?: JellyseerrMediaType.fromApiValue(type)
+        return MediaKey(mediaType, tmdbId)
+    }
+
+    /** Ratings are extras: a 404 (none known) gives null, other failures throw to the caller. */
+    private suspend fun getRatings(
+        requestName: String,
+        loader: suspend (sessionCookie: String) -> JellyseerrRatings,
+    ): JellyseerrRatings? {
+        return runRequest {
+            withSession { sessionCookie ->
+                try {
+                    retryJellyseerrRequest(requestName) { loader(sessionCookie) }
+                } catch (e: JellyseerrApiException) {
+                    if (e.code != 404) {
+                        throw e
+                    }
+                    null
+                }
+            }
+        }
     }
 
     private suspend fun getAllOpenIssues(
@@ -427,7 +522,7 @@ class JellyseerrRepositoryImpl(
                     JELLYSEERR_MAX_ATTEMPTS,
                 )
             } catch (e: IOException) {
-                if (attempt == JELLYSEERR_RETRY_DELAYS_MS.size) {
+                if (!e.isRetryable || attempt == JELLYSEERR_RETRY_DELAYS_MS.size) {
                     throw e
                 }
                 lastFailure = e
@@ -457,8 +552,24 @@ class JellyseerrRepositoryImpl(
                 throw e
             }
 
-            secureCredentialsStore.clearJellyseerrSession(context.serverId, context.username)
-            block(authenticate(context))
+            block(refreshSession(context, expiredCookie = sessionCookie))
+        }
+    }
+
+    /**
+     * Signs in again after [expiredCookie] was rejected. When several requests hit the expired
+     * cookie at once, the first one signs in and the others reuse its new cookie.
+     */
+    private suspend fun refreshSession(context: JellyseerrContext, expiredCookie: String): String {
+        return authMutex.withLock {
+            val storedCookie =
+                credentials { getJellyseerrSession(context.serverId, context.username) }
+            if (storedCookie != null && storedCookie != expiredCookie) {
+                return@withLock storedCookie
+            }
+
+            credentials { clearJellyseerrSession(context.serverId, context.username) }
+            authenticate(context)
         }
     }
 
@@ -485,8 +596,11 @@ class JellyseerrRepositoryImpl(
     }
 
     private suspend fun currentSessionCookie(context: JellyseerrContext): String {
-        return secureCredentialsStore.getJellyseerrSession(context.serverId, context.username)
-            ?: authenticate(context)
+        return credentials { getJellyseerrSession(context.serverId, context.username) }
+            ?: authMutex.withLock {
+                credentials { getJellyseerrSession(context.serverId, context.username) }
+                    ?: authenticate(context)
+            }
     }
 
     private suspend fun authenticate(context: JellyseerrContext): String {
@@ -519,13 +633,16 @@ class JellyseerrRepositoryImpl(
                 )
             }
 
-        secureCredentialsStore.saveJellyseerrSession(
-            context.serverId,
-            context.username,
-            sessionCookie,
-        )
+        credentials { saveJellyseerrSession(context.serverId, context.username, sessionCookie) }
         return sessionCookie
     }
+
+    /**
+     * The encrypted store sets up its keys on first use and decrypts on every read. Callers are
+     * often on the main thread (ViewModels), so this keeps that work off it.
+     */
+    private suspend fun <T> credentials(block: SecureCredentialsStore.() -> T): T =
+        withContext(Dispatchers.IO) { secureCredentialsStore.block() }
 
     private suspend fun currentContext(): JellyseerrContext {
         val serverId =
@@ -536,7 +653,7 @@ class JellyseerrRepositoryImpl(
                 ?: throw JellyseerrMissingCredentialsException()
         val username = serverData.user?.name ?: throw JellyseerrMissingCredentialsException()
         val password =
-            secureCredentialsStore.getUserPassword(serverId, username)
+            credentials { getUserPassword(serverId, username) }
                 ?: throw JellyseerrMissingCredentialsException()
 
         return JellyseerrContext(
@@ -551,11 +668,22 @@ class JellyseerrRepositoryImpl(
         val username: String,
         val password: String,
     )
+
+    private data class MediaKey(val mediaType: JellyseerrMediaType, val tmdbId: Int)
 }
 
 private val JellyseerrApiException.isRetryable: Boolean
     get() = code in setOf(408, 429, 500, 502, 503, 504)
 
+/**
+ * A timeout already waited the full timeout, and a failed DNS lookup means no network: trying again
+ * only makes the user wait several times longer for the same error.
+ */
+private val IOException.isRetryable: Boolean
+    get() = this !is InterruptedIOException && this !is UnknownHostException
+
+private const val MEDIA_METADATA_CACHE_SIZE = 200
+private const val RECENT_REQUEST_LOOKUP_CONCURRENCY = 4
 private const val JELLYSEERR_MAX_ATTEMPTS = 4
 private val JELLYSEERR_RETRY_DELAYS_MS = longArrayOf(250L, 750L, 1500L)
 

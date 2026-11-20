@@ -25,6 +25,8 @@ data class JellyseerrTvDetails(
     val seerrMediaId: Int? = null,
     val ratings: JellyseerrRatings?,
     val seasons: List<JellyseerrTvSeason>,
+    /** Open issues on this series, or null when Seerr did not say. */
+    val openIssueCount: Int? = null,
 ) {
     val year: String?
         get() = firstAirDate?.substringBefore('-')?.takeIf { it.isNotBlank() }
@@ -142,6 +144,7 @@ fun TvDetailsDto.toJellyseerrTvDetails(
         jellyfinMediaId = mediaInfo?.jellyfinMediaId,
         seerrMediaId = mediaInfo?.id,
         ratings = ratings ?: JellyseerrRatings(tmdbScore = voteAverage.toTmdbPercentScore()),
+        openIssueCount = mediaInfo?.openIssueCount(),
         seasons =
             seasons
                 .asSequence()

@@ -39,7 +39,7 @@ class JellyseerrApiService(
                     .post(json.encodeToString(request).toRequestBody(JSON_MEDIA_TYPE))
                     .build()
 
-            okHttpClient.newCall(httpRequest).execute().use { response ->
+            okHttpClient.newCall(httpRequest).await().use { response ->
                 val body = response.body.string()
                 if (!response.isSuccessful) {
                     throw JellyseerrApiException(response.code, body)
@@ -219,7 +219,7 @@ class JellyseerrApiService(
                     .delete()
                     .build()
 
-            okHttpClient.newCall(request).execute().use { response ->
+            okHttpClient.newCall(request).await().use { response ->
                 val body = response.body.string()
                 if (!response.isSuccessful) {
                     throw JellyseerrApiException(response.code, body)
@@ -241,7 +241,7 @@ class JellyseerrApiService(
                     .get()
                     .build()
 
-            okHttpClient.newCall(request).execute().use(::decodeResponse)
+            okHttpClient.newCall(request).await().use(::decodeResponse)
         }
 
     private suspend inline fun <reified T, reified R> post(
@@ -257,7 +257,7 @@ class JellyseerrApiService(
                     .post(json.encodeToString(payload).toRequestBody(JSON_MEDIA_TYPE))
                     .build()
 
-            okHttpClient.newCall(request).execute().use(::decodeResponse)
+            okHttpClient.newCall(request).await().use(::decodeResponse)
         }
 
     private inline fun <reified T> decodeResponse(response: okhttp3.Response): T {

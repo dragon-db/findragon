@@ -23,6 +23,8 @@ data class JellyseerrMovieDetails(
     val jellyfinMediaId: String?,
     val seerrMediaId: Int? = null,
     val ratings: JellyseerrRatings?,
+    /** Open issues on this title, or null when Seerr did not say. */
+    val openIssueCount: Int? = null,
 ) {
     val year: String?
         get() = releaseDate?.substringBefore('-')?.takeIf { it.isNotBlank() }
@@ -84,6 +86,7 @@ fun MovieDetailsDto.toJellyseerrMovieDetails(
         jellyfinMediaId = mediaInfo?.jellyfinMediaId,
         seerrMediaId = mediaInfo?.id,
         ratings = ratings ?: JellyseerrRatings(tmdbScore = voteAverage.toTmdbPercentScore()),
+        openIssueCount = mediaInfo?.openIssueCount(),
     )
 }
 
