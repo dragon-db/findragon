@@ -14,7 +14,6 @@ object FindragonConfig {
 
     val defaultServerUrl: String = BuildConfig.DEFAULT_SERVER_URL
     val seerrBaseUrl: String = BuildConfig.JELLYSEERR_BASE_URL
-    val jfaGoBaseUrl: String = BuildConfig.JFA_GO_BASE_URL
     val dragonHubUrl: String = BuildConfig.DRAGON_HUB_URL
 
     /** One-tap connect to the DragonDB Jellyfin server on the welcome screen. */
