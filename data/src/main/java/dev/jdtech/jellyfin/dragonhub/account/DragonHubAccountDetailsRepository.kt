@@ -5,7 +5,7 @@ import dev.jdtech.jellyfin.settings.domain.AccountDetailsResult
 import dev.jdtech.jellyfin.settings.domain.models.AccountDetails
 import dev.jdtech.jellyfin.settings.domain.models.AccountState
 
-/** Settings account card from DragonHub (replaces JFA-GO). */
+/** Settings account card from DragonHub. */
 class DragonHubAccountDetailsRepository(private val accountStatusSource: AccountStatusSource) :
     AccountDetailsRepository {
     override suspend fun getAccountDetails(): AccountDetailsResult {
