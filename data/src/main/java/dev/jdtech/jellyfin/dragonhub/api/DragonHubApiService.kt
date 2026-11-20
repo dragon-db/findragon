@@ -5,6 +5,8 @@ import dev.jdtech.jellyfin.dragonhub.api.dto.DragonHubErrorDto
 import dev.jdtech.jellyfin.dragonhub.api.dto.DragonHubNotificationsResponseDto
 import dev.jdtech.jellyfin.dragonhub.api.dto.DragonHubVersionResponseDto
 import dev.jdtech.jellyfin.findragon.FindragonConfig
+import dev.jdtech.jellyfin.jellyseerr.api.await
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.decodeFromString
@@ -37,29 +39,34 @@ class DragonHubApiService(
      */
     suspend fun getAccount(jellyfinToken: String): DragonHubAccountResponse =
         withContext(Dispatchers.IO) {
-            runCatching {
-                    val request =
-                        Request.Builder()
-                            .url(url("p/accountdb/app/account") {})
-                            .header(JELLYFIN_TOKEN_HEADER, jellyfinToken)
-                            .get()
-                            .build()
+            try {
+                val request =
+                    Request.Builder()
+                        .url(url("p/accountdb/app/account") {})
+                        .header(JELLYFIN_TOKEN_HEADER, jellyfinToken)
+                        .get()
+                        .build()
 
-                    okHttpClient.newCall(request).execute().use { response ->
-                        val body = response.body.string()
-                        if (response.isSuccessful) {
-                            DragonHubAccountResponse.Success(
-                                json.decodeFromString<DragonHubAccountDto>(body)
-                            )
-                        } else {
-                            val error =
-                                runCatching { json.decodeFromString<DragonHubErrorDto>(body) }
-                                    .getOrNull()
-                            DragonHubAccountResponse.Error(response.code, error?.code)
-                        }
+                // await(), not execute(): a caller that gives up (timeout, screen closed) also
+                // stops the HTTP call.
+                okHttpClient.newCall(request).await().use { response ->
+                    val body = response.body.string()
+                    if (response.isSuccessful) {
+                        DragonHubAccountResponse.Success(
+                            json.decodeFromString<DragonHubAccountDto>(body)
+                        )
+                    } else {
+                        val error =
+                            runCatching { json.decodeFromString<DragonHubErrorDto>(body) }
+                                .getOrNull()
+                        DragonHubAccountResponse.Error(response.code, error?.code)
                     }
                 }
-                .getOrElse { DragonHubAccountResponse.Unreachable }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                DragonHubAccountResponse.Unreachable
+            }
         }
 
     private suspend inline fun <reified T> get(
@@ -67,18 +74,21 @@ class DragonHubApiService(
         noinline configureUrl: HttpUrl.Builder.() -> Unit = {},
     ): T? =
         withContext<T?>(Dispatchers.IO) {
-            runCatching {
-                    val request =
-                        Request.Builder()
-                            .url(url(path, configureUrl))
-                            .get()
-                            .build()
+            try {
+                val request =
+                    Request.Builder()
+                        .url(url(path, configureUrl))
+                        .get()
+                        .build()
 
-                    okHttpClient.newCall(request).execute().use { response ->
-                        decodeResponse<T>(response)
-                    }
+                okHttpClient.newCall(request).await().use { response ->
+                    decodeResponse<T>(response)
                 }
-                .getOrNull()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                null
+            }
         }
 
     private inline fun <reified T> decodeResponse(response: Response): T? {
