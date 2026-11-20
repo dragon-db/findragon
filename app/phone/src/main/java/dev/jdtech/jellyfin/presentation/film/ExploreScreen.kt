@@ -16,7 +16,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -32,6 +31,7 @@ import androidx.compose.ui.tooling.preview.PreviewScreenSizes
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.LifecycleStartEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.jdtech.jellyfin.R
 import dev.jdtech.jellyfin.film.presentation.explore.ExploreEvent
@@ -62,7 +62,12 @@ fun ExploreScreen(
     val context = LocalContext.current
     val state by viewModel.state.collectAsStateWithLifecycle()
 
-    LaunchedEffect(true) { viewModel.loadData() }
+    // Every time Explore comes on screen (back from a title, tab switch, back to the app). The
+    // ViewModel only reloads when its rows are missing or old, and keeps them on screen meanwhile.
+    LifecycleStartEffect(viewModel) {
+        viewModel.loadData()
+        onStopOrDispose {}
+    }
 
     ObserveAsEvents(viewModel.events) { event ->
         when (event) {
@@ -74,7 +79,7 @@ fun ExploreScreen(
 
     ExploreScreenLayout(
         state = state,
-        onRetryClick = { viewModel.loadData(isRefreshing = true) },
+        onRetryClick = viewModel::refresh,
         onSearchQueryChanged = viewModel::search,
         onMediaClick = onMediaClick,
         onCancelRecentRequest = viewModel::cancelRecentRequest,

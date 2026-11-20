@@ -7,6 +7,7 @@ import dev.jdtech.jellyfin.jellyseerr.model.JellyseerrMedia
 import dev.jdtech.jellyfin.jellyseerr.model.JellyseerrMediaStatus
 import dev.jdtech.jellyfin.jellyseerr.model.JellyseerrMediaType
 import dev.jdtech.jellyfin.jellyseerr.model.JellyseerrMovieDetails
+import dev.jdtech.jellyfin.jellyseerr.model.JellyseerrRatings
 import dev.jdtech.jellyfin.jellyseerr.model.JellyseerrRecentRequest
 import dev.jdtech.jellyfin.jellyseerr.model.JellyseerrRequestStatus
 import dev.jdtech.jellyfin.jellyseerr.model.JellyseerrTvDetails
@@ -15,6 +16,7 @@ import dev.jdtech.jellyfin.jellyseerr.model.JellyseerrTvSeason
 import dev.jdtech.jellyfin.jellyseerr.model.JellyseerrTvSeasonDetails
 import dev.jdtech.jellyfin.jellyseerr.model.toJellyseerrMedia
 import dev.jdtech.jellyfin.models.FindroidItem
+import kotlin.time.Duration.Companion.minutes
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -26,6 +28,8 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -174,6 +178,168 @@ class ExploreViewModelTest {
         assertEquals(false, viewModel.state.value.detail.isSubmittingRequest)
         assertEquals(JellyseerrMediaStatus.PENDING, viewModel.state.value.detail.movieDetails?.mediaStatus)
     }
+
+    @Test
+    fun `loadData shows each row as soon as it arrives`() = runTest(dispatcher) {
+        val repository = FakeJellyseerrRepository()
+        val recentRequests = CompletableDeferred<List<JellyseerrRecentRequest>>()
+        repository.recentRequestsHandler = { recentRequests.await() }
+        repository.trendingHandler = { listOf(repository.currentMedia) }
+        val viewModel = ExploreViewModel(repository)
+
+        viewModel.loadData()
+        advanceUntilIdle()
+
+        assertTrue(viewModel.state.value.trending is SectionState.Success)
+        assertTrue(viewModel.state.value.popularSeries is SectionState.Success)
+        assertTrue(viewModel.state.value.recentRequests is RecentRequestsState.Loading)
+
+        recentRequests.complete(emptyList())
+        advanceUntilIdle()
+
+        assertTrue(viewModel.state.value.recentRequests is RecentRequestsState.Hidden)
+    }
+
+    @Test
+    fun `loadData does not reload rows loaded in the last five minutes`() = runTest(dispatcher) {
+        val repository = FakeJellyseerrRepository()
+        val viewModel = ExploreViewModel(repository)
+        var now = 0L
+        viewModel.nanoTime = { now }
+
+        viewModel.loadData()
+        advanceUntilIdle()
+        assertEquals(1, repository.trendingCalls)
+
+        now += 1.minutes.inWholeNanoseconds
+        viewModel.loadData()
+        advanceUntilIdle()
+        assertEquals(1, repository.trendingCalls)
+
+        now += 5.minutes.inWholeNanoseconds
+        viewModel.loadData()
+        advanceUntilIdle()
+        assertEquals(2, repository.trendingCalls)
+    }
+
+    @Test
+    fun `refresh keeps loaded rows on screen while reloading and when reloading fails`() =
+        runTest(dispatcher) {
+            val repository = FakeJellyseerrRepository()
+            repository.trendingHandler = { listOf(repository.currentMedia) }
+            val viewModel = ExploreViewModel(repository)
+            viewModel.loadData()
+            advanceUntilIdle()
+
+            val seerrAnswers = CompletableDeferred<Unit>()
+            repository.trendingHandler = {
+                seerrAnswers.await()
+                error("Seerr is down")
+            }
+            viewModel.refresh()
+            advanceUntilIdle()
+
+            assertTrue(viewModel.state.value.isRefreshing)
+            assertTrue(viewModel.state.value.trending is SectionState.Success)
+
+            seerrAnswers.complete(Unit)
+            advanceUntilIdle()
+
+            assertFalse(viewModel.state.value.isRefreshing)
+            assertTrue(viewModel.state.value.trending is SectionState.Success)
+
+            // A failed row means the next visit tries again instead of counting as fresh.
+            viewModel.loadData()
+            advanceUntilIdle()
+            assertEquals(3, repository.trendingCalls)
+        }
+
+    @Test
+    fun `loadData starts over when another account signs in`() = runTest(dispatcher) {
+        val repository = FakeJellyseerrRepository()
+        repository.trendingHandler = { listOf(repository.currentMedia) }
+        val viewModel = ExploreViewModel(repository)
+        viewModel.loadData()
+        advanceUntilIdle()
+        viewModel.loadDetail(42, JellyseerrMediaType.MOVIE)
+        advanceUntilIdle()
+
+        val seerrAnswers = CompletableDeferred<List<JellyseerrMedia>>()
+        repository.trendingHandler = { seerrAnswers.await() }
+        repository.accountKey = "server::someone-else"
+        viewModel.loadData()
+        advanceUntilIdle()
+
+        assertTrue(viewModel.state.value.trending is SectionState.Loading)
+        assertNull(viewModel.state.value.detail.tmdbId)
+        assertEquals(2, repository.trendingCalls)
+    }
+
+    @Test
+    fun `loadDetail shows details before ratings arrive`() = runTest(dispatcher) {
+        val repository = FakeJellyseerrRepository()
+        val ratings = CompletableDeferred<JellyseerrRatings?>()
+        repository.movieRatingsHandler = { ratings.await() }
+        val viewModel = ExploreViewModel(repository)
+
+        viewModel.loadDetail(42, JellyseerrMediaType.MOVIE)
+        advanceUntilIdle()
+
+        val detail = viewModel.state.value.detail
+        assertFalse(detail.isLoading)
+        assertEquals("Movie", detail.movieDetails?.title)
+        assertEquals(74, detail.movieDetails?.ratings?.tmdbScore)
+        assertNull(detail.movieDetails?.ratings?.rottenTomatoesCriticsScore)
+
+        ratings.complete(
+            JellyseerrRatings(
+                rottenTomatoesCriticsScore = 91,
+                rottenTomatoesAudienceScore = 88,
+                tmdbScore = 74,
+            )
+        )
+        advanceUntilIdle()
+
+        assertEquals(91, viewModel.state.value.detail.movieDetails?.ratings?.rottenTomatoesCriticsScore)
+    }
+
+    @Test
+    fun `loadDetail shows a title opened before at once and refreshes it quietly`() =
+        runTest(dispatcher) {
+            val repository = FakeJellyseerrRepository()
+            var ratingsCalls = 0
+            repository.movieRatingsHandler = {
+                ratingsCalls++
+                JellyseerrRatings(rottenTomatoesCriticsScore = 91, tmdbScore = 74)
+            }
+            val viewModel = ExploreViewModel(repository)
+            viewModel.loadDetail(42, JellyseerrMediaType.MOVIE)
+            advanceUntilIdle()
+            viewModel.loadDetail(100, JellyseerrMediaType.TV)
+            advanceUntilIdle()
+
+            val freshDetails = CompletableDeferred<JellyseerrMovieDetails>()
+            repository.movieDetailsHandler = { freshDetails.await() }
+            viewModel.loadDetail(42, JellyseerrMediaType.MOVIE)
+            advanceUntilIdle()
+
+            // The earlier copy (with its Rotten Tomatoes score) is on screen while Seerr answers.
+            var movie = viewModel.state.value.detail.movieDetails
+            assertEquals(42, movie?.tmdbId)
+            assertEquals(91, movie?.ratings?.rottenTomatoesCriticsScore)
+
+            freshDetails.complete(
+                repository
+                    .movieDetails(42)
+                    .copy(mediaStatus = JellyseerrMediaStatus.AVAILABLE, jellyfinMediaId = "movie-id")
+            )
+            advanceUntilIdle()
+
+            movie = viewModel.state.value.detail.movieDetails
+            assertEquals(JellyseerrMediaStatus.AVAILABLE, movie?.mediaStatus)
+            assertEquals(91, movie?.ratings?.rottenTomatoesCriticsScore)
+            assertEquals(1, ratingsCalls)
+        }
 }
 
 private class FakeJellyseerrRepository : JellyseerrRepository {
@@ -182,6 +348,42 @@ private class FakeJellyseerrRepository : JellyseerrRepository {
     var lastCancelledRequestId: Int? = null
     var recentRequests: List<JellyseerrRecentRequest> = emptyList()
     var requestMovieHandler: suspend (JellyseerrMedia) -> JellyseerrMedia = { it }
+    var accountKey: String? = "server::dragon"
+    var trendingCalls = 0
+    var trendingHandler: suspend () -> List<JellyseerrMedia> = { emptyList() }
+    var recentRequestsHandler: suspend () -> List<JellyseerrRecentRequest> = { recentRequests }
+    var movieDetailsHandler: suspend (Int) -> JellyseerrMovieDetails = { movieDetails(it) }
+    var movieRatingsHandler: suspend (Int) -> JellyseerrRatings? = { null }
+
+    fun movieDetails(tmdbId: Int) =
+        JellyseerrMovieDetails(
+            tmdbId = tmdbId,
+            title = "Movie",
+            originalTitle = null,
+            overview = "Overview",
+            tagline = null,
+            posterUrl = null,
+            backdropUrl = null,
+            releaseDate = "2025-01-01",
+            runtimeMinutes = 120,
+            statusText = "Released",
+            voteAverage = 7.4,
+            voteCount = 100,
+            originalLanguage = "en",
+            genres = emptyList(),
+            productionCountries = emptyList(),
+            spokenLanguages = emptyList(),
+            mediaStatus = JellyseerrMediaStatus.UNKNOWN,
+            jellyfinMediaId = null,
+            ratings = JellyseerrRatings(tmdbScore = 74),
+        )
+
+    override suspend fun currentAccountKey(): String? = accountKey
+
+    override suspend fun getMovieRatings(tmdbId: Int, tmdbVoteAverage: Double?): JellyseerrRatings? =
+        movieRatingsHandler(tmdbId)
+
+    override suspend fun getTvRatings(tmdbId: Int, tmdbVoteAverage: Double?): JellyseerrRatings? = null
 
     var currentDetails =
         JellyseerrTvDetails(
@@ -240,7 +442,10 @@ private class FakeJellyseerrRepository : JellyseerrRepository {
 
     override suspend fun search(query: String): List<JellyseerrMedia> = emptyList()
 
-    override suspend fun getTrending(): List<JellyseerrMedia> = emptyList()
+    override suspend fun getTrending(): List<JellyseerrMedia> {
+        trendingCalls++
+        return trendingHandler()
+    }
 
     override suspend fun getPopularMovies(): List<JellyseerrMedia> = emptyList()
 
@@ -248,7 +453,7 @@ private class FakeJellyseerrRepository : JellyseerrRepository {
 
     override suspend fun getUpcomingSeries(): List<JellyseerrMedia> = emptyList()
 
-    override suspend fun getRecentRequests(): List<JellyseerrRecentRequest> = recentRequests
+    override suspend fun getRecentRequests(): List<JellyseerrRecentRequest> = recentRequestsHandler()
 
     override suspend fun getOpenIssues(mediaId: Int): List<JellyseerrIssue> = emptyList()
 
@@ -256,29 +461,8 @@ private class FakeJellyseerrRepository : JellyseerrRepository {
         error("Not used in test")
     }
 
-    override suspend fun getMovieDetails(tmdbId: Int): JellyseerrMovieDetails {
-        return JellyseerrMovieDetails(
-            tmdbId = tmdbId,
-            title = "Movie",
-            originalTitle = null,
-            overview = "Overview",
-            tagline = null,
-            posterUrl = null,
-            backdropUrl = null,
-            releaseDate = "2025-01-01",
-            runtimeMinutes = 120,
-            statusText = "Released",
-            voteAverage = 7.4,
-            voteCount = 100,
-            originalLanguage = "en",
-            genres = emptyList(),
-            productionCountries = emptyList(),
-            spokenLanguages = emptyList(),
-            mediaStatus = JellyseerrMediaStatus.UNKNOWN,
-            jellyfinMediaId = null,
-            ratings = null,
-        )
-    }
+    override suspend fun getMovieDetails(tmdbId: Int): JellyseerrMovieDetails =
+        movieDetailsHandler(tmdbId)
 
     override suspend fun getTvDetails(tmdbId: Int): JellyseerrTvDetails = currentDetails
 

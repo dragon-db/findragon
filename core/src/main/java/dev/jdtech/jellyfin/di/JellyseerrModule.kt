@@ -13,6 +13,7 @@ import dev.jdtech.jellyfin.repository.JellyfinRepository
 import dev.jdtech.jellyfin.settings.domain.AppPreferences
 import javax.inject.Singleton
 import kotlinx.serialization.json.Json
+import okhttp3.Dispatcher
 import okhttp3.OkHttpClient
 
 @Module
@@ -33,7 +34,11 @@ object JellyseerrModule {
     @Provides
     @FindragonHttp
     fun provideJellyseerrOkHttpClient(): OkHttpClient {
-        return OkHttpClient()
+        // Seerr calls run through the dispatcher queue (so they can be cancelled). Its default of 5
+        // calls per host would make Explore's shelves, recent requests and an opened title queue
+        // behind each other.
+        val dispatcher = Dispatcher().apply { maxRequestsPerHost = 10 }
+        return OkHttpClient.Builder().dispatcher(dispatcher).build()
     }
 
     @Singleton
