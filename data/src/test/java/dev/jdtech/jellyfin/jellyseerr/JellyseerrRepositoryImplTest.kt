@@ -13,7 +13,13 @@ import dev.jdtech.jellyfin.jellyseerr.api.dto.IssueResultsDto
 import dev.jdtech.jellyfin.jellyseerr.api.dto.JellyseerrAuthRequestDto
 import dev.jdtech.jellyfin.jellyseerr.api.dto.MediaDto
 import dev.jdtech.jellyfin.jellyseerr.api.dto.MediaInfoDto
+import dev.jdtech.jellyfin.jellyseerr.api.dto.MediaIssueDto
+import dev.jdtech.jellyfin.jellyseerr.api.dto.MediaRequestDto
+import dev.jdtech.jellyfin.jellyseerr.api.dto.MovieDetailsDto
+import dev.jdtech.jellyfin.jellyseerr.api.dto.MovieRatingsCombinedDto
 import dev.jdtech.jellyfin.jellyseerr.api.dto.RequestResponseDto
+import dev.jdtech.jellyfin.jellyseerr.api.dto.RequestResultsDto
+import dev.jdtech.jellyfin.jellyseerr.api.dto.RottenTomatoesRatingsDto
 import dev.jdtech.jellyfin.jellyseerr.api.dto.SeasonWithEpisodesDto
 import dev.jdtech.jellyfin.jellyseerr.api.dto.SeasonStatusDto
 import dev.jdtech.jellyfin.jellyseerr.api.dto.TvDetailsDto
@@ -37,9 +43,14 @@ import io.mockk.mockk
 import io.mockk.runs
 import io.mockk.verify
 import java.io.IOException
+import java.net.SocketTimeoutException
 import java.util.UUID
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
 
@@ -238,6 +249,160 @@ class JellyseerrRepositoryImplTest {
         assertEquals(JellyseerrIssueType.SUBTITLE, issue.type)
         assertEquals("Subtitles are offset.", issue.message)
         coVerify(exactly = 1) { apiService.createIssue("session", expectedPayload) }
+    }
+
+    @Test
+    fun `getMovieDetails does not wait for ratings`() = runTest {
+        coEvery { apiService.getMovieDetails("session", 42) } returns movieDetailsDto()
+
+        val details = repository.getMovieDetails(42)
+
+        assertEquals("Retry Movie", details.title)
+        assertEquals(74, details.ratings?.tmdbScore)
+        coVerify(exactly = 0) { apiService.getMovieRatingsCombined(any(), any()) }
+    }
+
+    @Test
+    fun `details count the open issues Seerr sends with them`() = runTest {
+        coEvery { apiService.getMovieDetails("session", 42) } returns
+            movieDetailsDto()
+                .copy(
+                    mediaInfo =
+                        MediaInfoDto(
+                            id = 9,
+                            issues =
+                                listOf(
+                                    MediaIssueDto(id = 1, status = 1),
+                                    MediaIssueDto(id = 2, status = 2),
+                                    MediaIssueDto(id = 3, status = null),
+                                ),
+                        )
+                )
+        coEvery { apiService.getMovieDetails("session", 7) } returns
+            movieDetailsDto().copy(id = 7, mediaInfo = MediaInfoDto(id = 10))
+
+        assertEquals(2, repository.getMovieDetails(42).openIssueCount)
+        // Seerr left the list out: unknown, not zero.
+        assertNull(repository.getMovieDetails(7).openIssueCount)
+    }
+
+    @Test
+    fun `a timeout is not retried`() = runTest {
+        coEvery { apiService.getTrending("session") } throws SocketTimeoutException("timeout")
+
+        runCatching { repository.getTrending() }
+
+        coVerify(exactly = 1) { apiService.getTrending("session") }
+    }
+
+    @Test
+    fun `getMovieRatings maps Rotten Tomatoes scores and gives null when Seerr has none`() = runTest {
+        coEvery { apiService.getMovieRatingsCombined("session", 42) } returns
+            MovieRatingsCombinedDto(rt = RottenTomatoesRatingsDto(criticsScore = 91, audienceScore = 88))
+        coEvery { apiService.getMovieRatingsCombined("session", 7) } throws
+            JellyseerrApiException(404, "No ratings found.")
+
+        val ratings = repository.getMovieRatings(42, tmdbVoteAverage = 7.4)
+
+        assertEquals(91, ratings?.rottenTomatoesCriticsScore)
+        assertEquals(88, ratings?.rottenTomatoesAudienceScore)
+        assertEquals(74, ratings?.tmdbScore)
+        assertNull(repository.getMovieRatings(7, tmdbVoteAverage = 7.4))
+        coVerify(exactly = 1) { apiService.getMovieRatingsCombined("session", 7) }
+    }
+
+    @Test
+    fun `getRecentRequests looks up each title once and reuses it on the next load`() = runTest {
+        coEvery { apiService.getRecentRequests("session") } returns
+            RequestResultsDto(
+                results =
+                    listOf(
+                        movieRequestDto(requestId = 1, mediaStatus = 3),
+                        movieRequestDto(requestId = 2, mediaStatus = 3),
+                    )
+            )
+        coEvery { apiService.getMovieDetails("session", 42) } returns movieDetailsDto()
+
+        val first = repository.getRecentRequests()
+
+        assertEquals(listOf(1, 2), first.map { it.requestId })
+        assertEquals(listOf("Retry Movie", "Retry Movie"), first.map { it.media.title })
+        coVerify(exactly = 1) { apiService.getMovieDetails("session", 42) }
+
+        // The title became available; status comes from the request, title info from the cache.
+        coEvery { apiService.getRecentRequests("session") } returns
+            RequestResultsDto(
+                results =
+                    listOf(movieRequestDto(requestId = 1, mediaStatus = 5, jellyfinMediaId = "movie-id"))
+            )
+
+        val second = repository.getRecentRequests().single()
+
+        assertEquals("Retry Movie", second.media.title)
+        assertEquals(JellyseerrMediaStatus.AVAILABLE, second.media.status)
+        assertEquals("movie-id", second.media.jellyfinMediaId)
+        coVerify(exactly = 1) { apiService.getMovieDetails("session", 42) }
+    }
+
+    @Test
+    fun `requests that find the session expired at the same time sign in once`() = runTest {
+        var storedCookie: String? = "stale"
+        every { secureCredentialsStore.getJellyseerrSession("server-id", "dragon") } answers
+            { storedCookie }
+        every { secureCredentialsStore.clearJellyseerrSession("server-id", "dragon") } answers
+            { storedCookie = null }
+        every { secureCredentialsStore.saveJellyseerrSession("server-id", "dragon", any()) } answers
+            { storedCookie = thirdArg() }
+        coEvery { apiService.getTrending("stale") } throws JellyseerrApiException(401, "Unauthorized")
+        coEvery { apiService.getPopularMovies("stale") } throws
+            JellyseerrApiException(401, "Unauthorized")
+        coEvery { apiService.authenticate(any()) } coAnswers
+            {
+                delay(100)
+                "fresh"
+            }
+        coEvery { apiService.getTrending("fresh") } returns DiscoverResponseDto()
+        coEvery { apiService.getPopularMovies("fresh") } returns DiscoverResponseDto()
+
+        coroutineScope {
+            launch { repository.getTrending() }
+            launch { repository.getPopularMovies() }
+        }
+
+        coVerify(exactly = 1) { apiService.authenticate(any()) }
+        coVerify(exactly = 1) { apiService.getTrending("fresh") }
+        coVerify(exactly = 1) { apiService.getPopularMovies("fresh") }
+    }
+
+    private fun movieDetailsDto(): MovieDetailsDto {
+        return MovieDetailsDto(
+            id = 42,
+            title = "Retry Movie",
+            overview = "Overview",
+            releaseDate = "2026-01-01",
+            voteAverage = 7.4,
+            mediaInfo = MediaInfoDto(id = 9, tmdbId = 42, status = 3, mediaType = "movie"),
+        )
+    }
+
+    private fun movieRequestDto(
+        requestId: Int,
+        mediaStatus: Int,
+        jellyfinMediaId: String? = null,
+    ): MediaRequestDto {
+        return MediaRequestDto(
+            id = requestId,
+            status = 2,
+            type = "movie",
+            media =
+                MediaInfoDto(
+                    id = 9,
+                    tmdbId = 42,
+                    status = mediaStatus,
+                    mediaType = "movie",
+                    jellyfinMediaId = jellyfinMediaId,
+                ),
+        )
     }
 
     private fun movieMedia(): JellyseerrMedia {

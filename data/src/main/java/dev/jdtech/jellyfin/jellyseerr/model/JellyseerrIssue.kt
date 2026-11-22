@@ -1,6 +1,14 @@
 package dev.jdtech.jellyfin.jellyseerr.model
 
 import dev.jdtech.jellyfin.jellyseerr.api.dto.IssueDto
+import dev.jdtech.jellyfin.jellyseerr.api.dto.MediaInfoDto
+
+/**
+ * Open issues listed in the details response, or null when Seerr left the list out. An issue
+ * without a status counts as open, so a zero really means "nothing to show".
+ */
+internal fun MediaInfoDto.openIssueCount(): Int? =
+    issues?.count { it.status != JellyseerrIssueStatus.RESOLVED.code }
 
 data class JellyseerrIssue(
     val id: Int,

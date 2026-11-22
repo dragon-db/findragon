@@ -58,6 +58,17 @@ data class MediaInfoDto(
     val jellyfinMediaId4k: String? = null,
     val seasons: List<SeasonStatusDto> = emptyList(),
     val requests: List<RequestDto> = emptyList(),
+    /**
+     * Issues of this title, sent with movie/tv details. Null when this Seerr version (or the user's
+     * permissions) leaves them out. Seerr strips the messages here, so this only gives a count.
+     */
+    val issues: List<MediaIssueDto>? = null,
+)
+
+@Serializable
+data class MediaIssueDto(
+    val id: Int? = null,
+    val status: Int? = null,
 )
 
 @Serializable

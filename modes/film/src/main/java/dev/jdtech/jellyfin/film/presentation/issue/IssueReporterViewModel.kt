@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.jdtech.jellyfin.jellyseerr.JellyseerrRepository
 import dev.jdtech.jellyfin.jellyseerr.model.CreateJellyseerrIssue
+import dev.jdtech.jellyfin.jellyseerr.model.JellyseerrIssueStatus
 import dev.jdtech.jellyfin.models.FindroidEpisode
 import dev.jdtech.jellyfin.models.FindroidMovie
 import dev.jdtech.jellyfin.models.FindroidSeason
@@ -41,6 +42,7 @@ constructor(
                 title = movie.name,
                 seerrMediaId = details.seerrMediaId,
                 mediaType = IssueReportMediaType.MOVIE,
+                openIssueCount = details.openIssueCount,
             )
         }
     }
@@ -56,6 +58,7 @@ constructor(
                 seasons = details.seasons,
                 defaultSeasonNumber = details.seasons.maxOfOrNull { it.seasonNumber },
                 defaultEpisodeNumber = 0,
+                openIssueCount = details.openIssueCount,
             )
         }
     }
@@ -74,6 +77,7 @@ constructor(
                 seasons = details.seasons,
                 defaultSeasonNumber = season.indexNumber,
                 defaultEpisodeNumber = 0,
+                openIssueCount = details.openIssueCount,
             )
         }
     }
@@ -92,6 +96,7 @@ constructor(
                 seasons = details.seasons,
                 defaultSeasonNumber = episode.parentIndexNumber,
                 defaultEpisodeNumber = episode.indexNumber,
+                openIssueCount = details.openIssueCount,
             )
         }
     }
@@ -148,16 +153,20 @@ constructor(
         viewModelScope.launch {
             _state.value = _state.value.copy(isSubmitting = true, errorMessage = null)
             try {
-                jellyseerrRepository.createIssue(
-                    CreateJellyseerrIssue(
-                        mediaId = mediaId,
-                        type = form.type,
-                        message = message,
-                        problemSeason = if (target.isSeries) form.seasonNumber else 0,
-                        problemEpisode = if (target.isSeries) form.episodeNumber else 0,
+                val created =
+                    jellyseerrRepository.createIssue(
+                        CreateJellyseerrIssue(
+                            mediaId = mediaId,
+                            type = form.type,
+                            message = message,
+                            problemSeason = if (target.isSeries) form.seasonNumber else 0,
+                            problemEpisode = if (target.isSeries) form.episodeNumber else 0,
+                        )
                     )
-                )
-                val issues = jellyseerrRepository.getOpenIssues(mediaId)
+                // Seerr answers with the new issue, so no need to read every open issue again.
+                val issues =
+                    listOf(created).filter { it.status == JellyseerrIssueStatus.OPEN } +
+                        _state.value.openIssues.filterNot { it.id == created.id }
                 _state.value =
                     _state.value.copy(
                         isSubmitting = false,
@@ -189,7 +198,13 @@ constructor(
             try {
                 val target = block()
                 val issues =
-                    target.seerrMediaId?.let { jellyseerrRepository.getOpenIssues(it) }.orEmpty()
+                    when {
+                        target.seerrMediaId == null -> emptyList()
+                        // The details already say there are none: skip reading every open issue on
+                        // the server (Seerr cannot filter that list by title).
+                        target.openIssueCount == 0 -> emptyList()
+                        else -> jellyseerrRepository.getOpenIssues(target.seerrMediaId)
+                    }
                 _state.value = IssueReporterState(target = target, openIssues = issues)
             } catch (e: CancellationException) {
                 throw e
