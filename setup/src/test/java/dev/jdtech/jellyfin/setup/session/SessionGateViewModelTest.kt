@@ -12,6 +12,7 @@ import dev.jdtech.jellyfin.setup.presentation.session.SessionGateViewModel
 import java.util.UUID
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -229,6 +230,45 @@ class SessionGateViewModelTest {
     }
 
     @Test
+    fun `a slow hub does not hold back the app`() = runTest(dispatcher) {
+        accountSource.result = known(AccountBlock.EXPIRED)
+        accountSource.delayMs = 10_000L
+        val viewModel = viewModel(FakeSessionAccess())
+
+        viewModel.start()
+        advanceTimeBy(100)
+
+        // The login works, so the app shows before the hub answers.
+        assertTrue(viewModel.state.value.isReady)
+        assertNull(viewModel.state.value.accountNotice)
+
+        advanceUntilIdle()
+        assertEquals(AccountBlock.EXPIRED, viewModel.state.value.accountNotice?.block)
+    }
+
+    @Test
+    fun `a hub that does not answer delays the sign-in screen by at most a few seconds`() =
+        runTest(dispatcher) {
+            accountSource.result = known(AccountBlock.DISABLED_BY_ADMIN)
+            accountSource.delayMs = 60_000L
+            val viewModel =
+                viewModel(
+                    FakeSessionAccess(
+                        verifyError = InvalidStatusException(401),
+                        loginError = InvalidStatusException(403),
+                    )
+                )
+
+            viewModel.start()
+            advanceTimeBy(SessionGateViewModel.SIGN_IN_HUB_TIMEOUT_MS + 1)
+
+            val state = viewModel.state.value
+            assertEquals("dragon", state.pendingSignIn)
+            assertEquals(SignInReason.ACCOUNT_BLOCKED, state.dialog)
+            assertNull(state.accountNotice)
+        }
+
+    @Test
     fun `active account shows no notice`() = runTest(dispatcher) {
         accountSource.result = known(block = null)
         val viewModel = viewModel(FakeSessionAccess())
@@ -439,9 +479,13 @@ class SessionGateViewModelTest {
 
         var onFetch: () -> Unit = {}
 
+        /** How long the hub takes to answer. */
+        var delayMs = 0L
+
         override suspend fun fetch(): AccountStatusResult {
             fetchCalls++
             onFetch()
+            delay(delayMs)
             return result
         }
     }
