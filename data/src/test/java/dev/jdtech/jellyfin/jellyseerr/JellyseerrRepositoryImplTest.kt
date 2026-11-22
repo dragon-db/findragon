@@ -69,7 +69,7 @@ class JellyseerrRepositoryImplTest {
         every { secureCredentialsStore.getJellyseerrSession("server-id", "dragon") } returns "session"
         every { secureCredentialsStore.clearJellyseerrSession(any(), any()) } just runs
         every { secureCredentialsStore.saveJellyseerrSession(any(), any(), any()) } just runs
-        every { serverDatabase.getServerWithAddressAndUser("server-id") } returns serverWithUser()
+        coEvery { serverDatabase.getServerWithAddressAndUser("server-id") } returns serverWithUser()
     }
 
     @Test

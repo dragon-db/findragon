@@ -7,7 +7,7 @@
  * merging a new upstream release.
  */
 object FindragonVersions {
-    const val FORK_PATCH = 2
+    const val FORK_PATCH = 1
 
     val APP_CODE: Int
         get() {

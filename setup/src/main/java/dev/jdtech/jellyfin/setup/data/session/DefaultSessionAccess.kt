@@ -2,6 +2,7 @@ package dev.jdtech.jellyfin.setup.data.session
 
 import dev.jdtech.jellyfin.api.JellyfinApi
 import dev.jdtech.jellyfin.auth.SecureCredentialsStore
+import dev.jdtech.jellyfin.database.ServerDatabaseDao
 import dev.jdtech.jellyfin.models.User
 import dev.jdtech.jellyfin.settings.domain.AppPreferences
 import dev.jdtech.jellyfin.setup.domain.SetupRepository
@@ -14,6 +15,7 @@ class DefaultSessionAccess(
     private val setupRepository: SetupRepository,
     private val secureCredentialsStore: SecureCredentialsStore,
     private val appPreferences: AppPreferences,
+    private val database: ServerDatabaseDao,
 ) : SessionAccess {
     override suspend fun isOfflineMode(): Boolean =
         appPreferences.getValue(appPreferences.offlineMode)
@@ -34,5 +36,12 @@ class DefaultSessionAccess(
 
     override suspend fun login(username: String, password: String) {
         setupRepository.login(username, password)
+    }
+
+    override suspend fun signOutCurrentUser() {
+        withContext(Dispatchers.IO) {
+            val server = setupRepository.getCurrentServer() ?: return@withContext
+            database.updateServer(server.copy(currentUserId = null))
+        }
     }
 }

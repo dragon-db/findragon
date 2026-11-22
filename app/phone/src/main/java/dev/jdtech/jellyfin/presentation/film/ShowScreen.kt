@@ -310,7 +310,8 @@ private fun ShowScreenLayout(
                     }
                     LazyRow(
                         contentPadding = PaddingValues(start = paddingStart, end = paddingEnd),
-                        horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacings.default),
+                        horizontalArrangement =
+                            Arrangement.spacedBy(MaterialTheme.spacings.default),
                     ) {
                         items(items = state.seasons, key = { item -> item.id }) { season ->
                             ItemCard(

@@ -20,6 +20,9 @@ internal class FakeSessionAccess(
 
     val logins = mutableListOf<Pair<String, String>>()
 
+    var signOutCalls = 0
+        private set
+
     override suspend fun isOfflineMode(): Boolean = offline
 
     override suspend fun currentUser(): User? = user
@@ -39,5 +42,10 @@ internal class FakeSessionAccess(
     override suspend fun login(username: String, password: String) {
         logins += username to password
         loginError?.let { throw it }
+    }
+
+    override suspend fun signOutCurrentUser() {
+        signOutCalls++
+        user = null
     }
 }

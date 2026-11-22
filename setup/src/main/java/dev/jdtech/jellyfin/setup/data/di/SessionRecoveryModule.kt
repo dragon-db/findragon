@@ -7,6 +7,7 @@ import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import dev.jdtech.jellyfin.api.JellyfinApi
 import dev.jdtech.jellyfin.auth.SecureCredentialsStore
+import dev.jdtech.jellyfin.database.ServerDatabaseDao
 import dev.jdtech.jellyfin.settings.domain.AppPreferences
 import dev.jdtech.jellyfin.setup.data.session.DefaultSessionAccess
 import dev.jdtech.jellyfin.setup.domain.SetupRepository
@@ -24,6 +25,7 @@ object SessionRecoveryModule {
         setupRepository: SetupRepository,
         secureCredentialsStore: SecureCredentialsStore,
         appPreferences: AppPreferences,
+        database: ServerDatabaseDao,
     ): SessionRecovery {
         return SessionRecovery(
             DefaultSessionAccess(
@@ -31,6 +33,7 @@ object SessionRecoveryModule {
                 setupRepository = setupRepository,
                 secureCredentialsStore = secureCredentialsStore,
                 appPreferences = appPreferences,
+                database = database,
             )
         )
     }

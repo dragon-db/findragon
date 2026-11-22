@@ -27,6 +27,7 @@ import dev.jdtech.jellyfin.settings.presentation.models.PreferenceGroup
 import dev.jdtech.jellyfin.settings.presentation.models.PreferenceIntInput
 import dev.jdtech.jellyfin.settings.presentation.models.PreferenceLongInput
 import dev.jdtech.jellyfin.settings.presentation.models.PreferenceMultiSelect
+import dev.jdtech.jellyfin.settings.presentation.models.PreferencePermission
 import dev.jdtech.jellyfin.settings.presentation.models.PreferenceSelect
 import dev.jdtech.jellyfin.settings.presentation.models.PreferenceSwitch
 import dev.jdtech.jellyfin.settings.presentation.settings.SettingsAction
@@ -49,7 +50,9 @@ fun SettingsGroupCard(
         Card(
             modifier = modifier,
             colors =
-                CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+                CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainer
+                ),
         ) {
             group.preferences.fastForEachIndexed { index, preference ->
                 when (preference) {
@@ -107,6 +110,11 @@ fun SettingsGroupCard(
                         )
                     is PreferenceAppLanguage ->
                         SettingsAppLanguageCard(
+                            preference = preference,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    is PreferencePermission ->
+                        SettingsPermissionCard(
                             preference = preference,
                             modifier = Modifier.fillMaxWidth(),
                         )

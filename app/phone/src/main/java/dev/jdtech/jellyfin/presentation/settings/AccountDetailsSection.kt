@@ -155,7 +155,7 @@ internal data class AccountSummaryRow(
     val isWarning: Boolean = false,
 )
 
-internal fun shouldShowAccountDetails(isConfigured: Boolean, indexes: IntArray): Boolean {
+internal fun shouldShowAccountDetails(isConfigured: Boolean, indexes: List<Int>): Boolean {
     return isConfigured &&
         (indexes.isEmpty() || (indexes.size == 1 && indexes.first() == CoreR.string.title_settings))
 }

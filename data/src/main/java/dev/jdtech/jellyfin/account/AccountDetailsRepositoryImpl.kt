@@ -50,7 +50,7 @@ class AccountDetailsRepositoryImpl(
         }
     }
 
-    private fun currentContext(): AccountDetailsContext {
+    private suspend fun currentContext(): AccountDetailsContext {
         val serverId =
             appPreferences.getValue(appPreferences.currentServer)
                 ?: throw AccountDetailsContextException("No current Jellyfin server is selected.")

@@ -14,12 +14,14 @@ import dev.jdtech.jellyfin.setup.domain.session.SessionRecovery
 import dev.jdtech.jellyfin.setup.domain.session.SignInReason
 import java.util.UUID
 import javax.inject.Inject
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
+import timber.log.Timber
 
 /** Milliseconds since boot. A fake in tests. */
 fun interface SessionClock {
@@ -190,6 +192,16 @@ constructor(
             } else {
                 fetchAccountStatus()?.takeIf { it.block != null && it.block != AccountBlock.EXPIRED }
             }
+
+        // After the hub call, which identifies the user by the dead login. Signing out makes the app
+        // show the user list, where the sign-in screen opens on top.
+        try {
+            sessionRecovery.signOut()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Timber.w(e, "Could not sign out the dead Jellyfin login")
+        }
 
         _state.update {
             it.copy(
