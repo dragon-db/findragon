@@ -65,9 +65,9 @@ constructor(
 
     fun loadForSeason(season: FindroidSeason) {
         loadTarget(key = "season-${season.id}") {
-            val show = jellyfinRepository.getShow(season.seriesId)
+            // Seerr's tv/{id} wants the series id. A season's own TMDB id is a different number.
             val tmdbId =
-                season.tmdbId ?: show.tmdbId
+                jellyfinRepository.getShow(season.seriesId).tmdbId
                     ?: return@loadTarget unresolvedTarget(season.seriesName, IssueReportMediaType.SERIES)
             val details = jellyseerrRepository.getTvDetails(tmdbId)
             IssueReportTarget(
@@ -84,9 +84,9 @@ constructor(
 
     fun loadForEpisode(episode: FindroidEpisode) {
         loadTarget(key = "episode-${episode.id}") {
-            val show = jellyfinRepository.getShow(episode.seriesId)
+            // Seerr's tv/{id} wants the series id. An episode's own TMDB id is a different number.
             val tmdbId =
-                episode.tmdbId ?: show.tmdbId
+                jellyfinRepository.getShow(episode.seriesId).tmdbId
                     ?: return@loadTarget unresolvedTarget(episode.seriesName, IssueReportMediaType.SERIES)
             val details = jellyseerrRepository.getTvDetails(tmdbId)
             IssueReportTarget(

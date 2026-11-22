@@ -1,16 +1,19 @@
 package dev.jdtech.jellyfin.presentation.film.components
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.verticalScroll
@@ -31,9 +34,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -239,15 +244,36 @@ private fun IssueDialogFrame(
     positiveButton: @Composable () -> Unit,
     content: @Composable () -> Unit,
 ) {
+    val currentOnDismiss by rememberUpdatedState(onDismiss)
+
     Dialog(
         onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false),
+        // decorFitsSystemWindows = false: the keyboard arrives as an inset that this layout handles
+        // (safeDrawingPadding below), and the window itself stays put. With the default (true)
+        // Android pans the whole dialog window to keep the cursor visible while the text field
+        // also scrolls the form, and the two fought on every keystroke: the taller series form
+        // jumped up and down. Compose recommends this setting with usePlatformDefaultWidth = false.
+        properties =
+            DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
     ) {
-        BoxWithConstraints(modifier = Modifier.fillMaxWidth().padding(horizontal = MaterialTheme.spacings.medium)) {
+        BoxWithConstraints(
+            modifier =
+                Modifier.fillMaxSize()
+                    // The content fills the whole window now, so a tap outside the card is
+                    // caught here instead of by the dialog window.
+                    .pointerInput(Unit) { detectTapGestures { currentOnDismiss() } }
+                    // Only the space between the system bars and above the keyboard: with the
+                    // keyboard open the card shrinks to fit and its form scrolls inside it.
+                    .safeDrawingPadding()
+                    .padding(horizontal = MaterialTheme.spacings.medium),
+            contentAlignment = Alignment.Center,
+        ) {
             Card(
                 modifier =
                     Modifier.fillMaxWidth()
-                        .heightIn(max = maxHeight * 0.9f),
+                        .heightIn(max = maxHeight * 0.9f)
+                        // Taps on the card itself must not close the dialog.
+                        .pointerInput(Unit) { detectTapGestures {} },
                 shape = MaterialTheme.shapes.extraLarge,
             ) {
                 Column(modifier = Modifier.fillMaxWidth().padding(top = MaterialTheme.spacings.default)) {
