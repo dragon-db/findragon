@@ -19,8 +19,7 @@ import org.gradle.api.Project
 object FindragonBuildConfig {
     const val FILE_NAME = "findragon.properties"
     const val FLAG = "FINDRAGON_INFRA"
-    val URL_KEYS =
-        listOf("DEFAULT_SERVER_URL", "JELLYSEERR_BASE_URL", "JFA_GO_BASE_URL", "DRAGON_HUB_URL")
+    val URL_KEYS = listOf("DEFAULT_SERVER_URL", "JELLYSEERR_BASE_URL", "DRAGON_HUB_URL")
 
     data class Field(val type: String, val name: String, val value: String)
 
